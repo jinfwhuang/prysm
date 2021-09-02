@@ -8,7 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	types "github.com/prysmaticlabs/eth2-types"
-	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/beacon-chain/core"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	validatorpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1/validator-client"
 	wrapperv1 "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1/wrapper"
@@ -97,7 +97,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot types.Slot, pubKey [4
 		Signature: sig,
 	}
 
-	signingRoot, err := helpers.ComputeSigningRoot(b, domain.SignatureDomain)
+	signingRoot, err := core.ComputeSigningRoot(b, domain.SignatureDomain)
 	if err != nil {
 		if v.emitAccountMetrics {
 			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
@@ -204,7 +204,7 @@ func (v *validator) signRandaoReveal(ctx context.Context, pubKey [48]byte, epoch
 
 	var randaoReveal bls.Signature
 	sszUint := types.SSZUint64(epoch)
-	root, err := helpers.ComputeSigningRoot(&sszUint, domain.SignatureDomain)
+	root, err := core.ComputeSigningRoot(&sszUint, domain.SignatureDomain)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (v *validator) signBlock(ctx context.Context, pubKey [48]byte, epoch types.
 	}
 
 	var sig bls.Signature
-	blockRoot, err := helpers.ComputeSigningRoot(b, domain.SignatureDomain)
+	blockRoot, err := core.ComputeSigningRoot(b, domain.SignatureDomain)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, signingRootErr)
 	}
@@ -268,7 +268,7 @@ func signVoluntaryExit(
 		return nil, errors.New(domainDataErr)
 	}
 
-	exitRoot, err := helpers.ComputeSigningRoot(exit, domain.SignatureDomain)
+	exitRoot, err := core.ComputeSigningRoot(exit, domain.SignatureDomain)
 	if err != nil {
 		return nil, errors.Wrap(err, signingRootErr)
 	}

@@ -3,7 +3,7 @@ package depositutil_test
 import (
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/beacon-chain/core"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/shared/bls"
 	"github.com/prysmaticlabs/prysm/shared/depositutil"
@@ -32,7 +32,7 @@ func TestDepositInput_GeneratesPb(t *testing.T) {
 	}
 	sr, err := testData.HashTreeRoot()
 	require.NoError(t, err)
-	domain, err := helpers.ComputeDomain(
+	domain, err := core.ComputeDomain(
 		params.BeaconConfig().DomainDeposit,
 		nil, /*forkVersion*/
 		nil, /*genesisValidatorsRoot*/
@@ -47,7 +47,7 @@ func TestVerifyDepositSignature_ValidSig(t *testing.T) {
 	deposits, _, err := testutil.DeterministicDepositsAndKeys(1)
 	require.NoError(t, err)
 	deposit := deposits[0]
-	domain, err := helpers.ComputeDomain(
+	domain, err := core.ComputeDomain(
 		params.BeaconConfig().DomainDeposit,
 		params.BeaconConfig().GenesisForkVersion,
 		params.BeaconConfig().ZeroHash[:],
@@ -61,7 +61,7 @@ func TestVerifyDepositSignature_InvalidSig(t *testing.T) {
 	deposits, _, err := testutil.DeterministicDepositsAndKeys(1)
 	require.NoError(t, err)
 	deposit := deposits[0]
-	domain, err := helpers.ComputeDomain(
+	domain, err := core.ComputeDomain(
 		params.BeaconConfig().DomainDeposit,
 		params.BeaconConfig().GenesisForkVersion,
 		params.BeaconConfig().ZeroHash[:],

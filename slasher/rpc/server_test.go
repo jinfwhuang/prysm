@@ -9,7 +9,6 @@ import (
 	"github.com/golang/mock/gomock"
 	types "github.com/prysmaticlabs/eth2-types"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core"
-	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
 	p2ptypes "github.com/prysmaticlabs/prysm/beacon-chain/p2p/types"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/shared/bls"
@@ -74,7 +73,7 @@ func TestServer_IsSlashableAttestation(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 	).Return(wantedValidators1, nil).AnyTimes()
-	domain, err := helpers.Domain(fork, savedAttestation.Data.Target.Epoch, params.BeaconConfig().DomainBeaconAttester, wantedGenesis.GenesisValidatorsRoot)
+	domain, err := core.Domain(fork, savedAttestation.Data.Target.Epoch, params.BeaconConfig().DomainBeaconAttester, wantedGenesis.GenesisValidatorsRoot)
 	require.NoError(t, err)
 	wg := sync.WaitGroup{}
 	wg.Add(100)
@@ -84,7 +83,7 @@ func TestServer_IsSlashableAttestation(t *testing.T) {
 			defer wg.Done()
 			iatt := copyutil.CopyIndexedAttestation(savedAttestation)
 			iatt.Data.Slot += j
-			root, err := helpers.ComputeSigningRoot(iatt.Data, domain)
+			root, err := core.ComputeSigningRoot(iatt.Data, domain)
 			require.NoError(t, err)
 			validatorSig := keys[iatt.AttestingIndices[0]].Sign(root[:])
 			marshalledSig := validatorSig.Marshal()
@@ -152,9 +151,9 @@ func TestServer_IsSlashableAttestationNoUpdate(t *testing.T) {
 	}
 	fork, err := p2putils.Fork(savedAttestation.Data.Target.Epoch)
 	require.NoError(t, err)
-	domain, err := helpers.Domain(fork, savedAttestation.Data.Target.Epoch, params.BeaconConfig().DomainBeaconAttester, wantedGenesis.GenesisValidatorsRoot)
+	domain, err := core.Domain(fork, savedAttestation.Data.Target.Epoch, params.BeaconConfig().DomainBeaconAttester, wantedGenesis.GenesisValidatorsRoot)
 	require.NoError(t, err)
-	root, err := helpers.ComputeSigningRoot(savedAttestation.Data, domain)
+	root, err := core.ComputeSigningRoot(savedAttestation.Data, domain)
 	require.NoError(t, err)
 	var sig []bls.Signature
 	for _, idx := range savedAttestation.AttestingIndices {
@@ -219,7 +218,7 @@ func TestServer_IsSlashableBlock(t *testing.T) {
 	savedBlockEpoch := core.SlotToEpoch(savedBlock.Header.Slot)
 	fork, err := p2putils.Fork(savedBlockEpoch)
 	require.NoError(t, err)
-	domain, err := helpers.Domain(fork, savedBlockEpoch, params.BeaconConfig().DomainBeaconProposer, wantedGenesis.GenesisValidatorsRoot)
+	domain, err := core.Domain(fork, savedBlockEpoch, params.BeaconConfig().DomainBeaconProposer, wantedGenesis.GenesisValidatorsRoot)
 	require.NoError(t, err)
 
 	bcCfg := &beaconclient.Config{BeaconClient: bClient, NodeClient: nClient, SlasherDB: db}
@@ -239,7 +238,7 @@ func TestServer_IsSlashableBlock(t *testing.T) {
 			bhr, err := sbbh.Header.HashTreeRoot()
 			assert.NoError(t, err)
 			sszBytes := p2ptypes.SSZBytes(bhr[:])
-			root, err := helpers.ComputeSigningRoot(&sszBytes, domain)
+			root, err := core.ComputeSigningRoot(&sszBytes, domain)
 			assert.NoError(t, err)
 			sbbh.Signature = keys[sbbh.Header.ProposerIndex].Sign(root[:]).Marshal()
 			slashings, err := server.IsSlashableBlock(ctx, sbbh)
@@ -303,12 +302,12 @@ func TestServer_IsSlashableBlockNoUpdate(t *testing.T) {
 	savedBlockEpoch := core.SlotToEpoch(savedBlock.Header.Slot)
 	fork, err := p2putils.Fork(savedBlockEpoch)
 	require.NoError(t, err)
-	domain, err := helpers.Domain(fork, savedBlockEpoch, params.BeaconConfig().DomainBeaconProposer, wantedGenesis.GenesisValidatorsRoot)
+	domain, err := core.Domain(fork, savedBlockEpoch, params.BeaconConfig().DomainBeaconProposer, wantedGenesis.GenesisValidatorsRoot)
 	require.NoError(t, err)
 	bhr, err := savedBlock.Header.HashTreeRoot()
 	require.NoError(t, err)
 	sszBytes := p2ptypes.SSZBytes(bhr[:])
-	root, err := helpers.ComputeSigningRoot(&sszBytes, domain)
+	root, err := core.ComputeSigningRoot(&sszBytes, domain)
 	require.NoError(t, err)
 	blockSig := keys[savedBlock.Header.ProposerIndex].Sign(root[:])
 	marshalledSig := blockSig.Marshal()

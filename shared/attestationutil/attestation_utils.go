@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	types "github.com/prysmaticlabs/eth2-types"
 	"github.com/prysmaticlabs/go-bitfield"
-	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/beacon-chain/core"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/shared/bls"
 	"github.com/prysmaticlabs/prysm/shared/params"
@@ -104,7 +104,7 @@ func VerifyIndexedAttestationSig(ctx context.Context, indexedAtt *ethpb.IndexedA
 	ctx, span := trace.StartSpan(ctx, "attestationutil.VerifyIndexedAttestationSig")
 	defer span.End()
 	indices := indexedAtt.AttestingIndices
-	messageHash, err := helpers.ComputeSigningRoot(indexedAtt.Data, domain)
+	messageHash, err := core.ComputeSigningRoot(indexedAtt.Data, domain)
 	if err != nil {
 		return errors.Wrap(err, "could not get signing root of object")
 	}
@@ -116,7 +116,7 @@ func VerifyIndexedAttestationSig(ctx context.Context, indexedAtt *ethpb.IndexedA
 
 	voted := len(indices) > 0
 	if voted && !sig.FastAggregateVerify(pubKeys, messageHash) {
-		return helpers.ErrSigFailedToVerify
+		return core.ErrSigFailedToVerify
 	}
 	return nil
 }

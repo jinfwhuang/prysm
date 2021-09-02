@@ -285,11 +285,11 @@ func BlockSignatureAltair(
 		return nil, err
 	}
 	block.StateRoot = s[:]
-	domain, err := helpers.Domain(bState.Fork(), core2.CurrentEpoch(bState), params.BeaconConfig().DomainBeaconProposer, bState.GenesisValidatorRoot())
+	domain, err := core2.Domain(bState.Fork(), core2.CurrentEpoch(bState), params.BeaconConfig().DomainBeaconProposer, bState.GenesisValidatorRoot())
 	if err != nil {
 		return nil, err
 	}
-	blockRoot, err := helpers.ComputeSigningRoot(block, domain)
+	blockRoot, err := core2.ComputeSigningRoot(block, domain)
 	if err != nil {
 		return nil, err
 	}

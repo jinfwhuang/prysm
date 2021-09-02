@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	types "github.com/prysmaticlabs/eth2-types"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core"
-	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	slashpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/shared/attestationutil"
@@ -101,7 +100,7 @@ func (s *Server) IsSlashableAttestation(ctx context.Context, req *ethpb.IndexedA
 	if err != nil {
 		return nil, err
 	}
-	domain, err := helpers.Domain(fork, req.Data.Target.Epoch, params.BeaconConfig().DomainBeaconAttester, gvr)
+	domain, err := core.Domain(fork, req.Data.Target.Epoch, params.BeaconConfig().DomainBeaconAttester, gvr)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +178,7 @@ func (s *Server) IsSlashableBlock(ctx context.Context, req *ethpb.SignedBeaconBl
 	if err != nil {
 		return nil, err
 	}
-	domain, err := helpers.Domain(fork, blockEpoch, params.BeaconConfig().DomainBeaconProposer, gvr)
+	domain, err := core.Domain(fork, blockEpoch, params.BeaconConfig().DomainBeaconProposer, gvr)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +186,7 @@ func (s *Server) IsSlashableBlock(ctx context.Context, req *ethpb.SignedBeaconBl
 	if err != nil {
 		return nil, err
 	}
-	if err := helpers.VerifyBlockHeaderSigningRoot(
+	if err := core.VerifyBlockHeaderSigningRoot(
 		req.Header,
 		pkMap[req.Header.ProposerIndex],
 		req.Signature, domain); err != nil {

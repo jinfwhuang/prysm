@@ -4,7 +4,7 @@ package depositutil
 
 import (
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/beacon-chain/core"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/shared/bls"
 	"github.com/prysmaticlabs/prysm/shared/copyutil"
@@ -39,7 +39,7 @@ func DepositInput(depositKey, withdrawalKey bls.SecretKey, amountInGwei uint64) 
 		return nil, [32]byte{}, err
 	}
 
-	domain, err := helpers.ComputeDomain(
+	domain, err := core.ComputeDomain(
 		params.BeaconConfig().DomainDeposit,
 		nil, /*forkVersion*/
 		nil, /*genesisValidatorsRoot*/
@@ -110,7 +110,7 @@ func VerifyDepositSignature(dd *ethpb.Deposit_Data, domain []byte) error {
 		return errors.Wrap(err, "could not get container root")
 	}
 	if !sig.Verify(publicKey, ctrRoot[:]) {
-		return helpers.ErrSigFailedToVerify
+		return core.ErrSigFailedToVerify
 	}
 	return nil
 }

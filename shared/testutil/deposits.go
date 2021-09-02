@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
+	core2 "github.com/prysmaticlabs/prysm/beacon-chain/core"
 	core "github.com/prysmaticlabs/prysm/beacon-chain/core/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
@@ -170,7 +170,7 @@ func signedDeposit(
 		WithdrawalCredentials: withdrawalCreds[:],
 	}
 
-	domain, err := helpers.ComputeDomain(params.BeaconConfig().DomainDeposit, nil, nil)
+	domain, err := core2.ComputeDomain(params.BeaconConfig().DomainDeposit, nil, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute domain")
 	}
@@ -334,7 +334,7 @@ func DeterministicDepositsAndKeysSameValidator(numDeposits uint64) ([]*ethpb.Dep
 				WithdrawalCredentials: withdrawalCreds[:],
 			}
 
-			domain, err := helpers.ComputeDomain(params.BeaconConfig().DomainDeposit, nil, nil)
+			domain, err := core2.ComputeDomain(params.BeaconConfig().DomainDeposit, nil, nil)
 			if err != nil {
 				return nil, nil, errors.Wrap(err, "could not compute domain")
 			}

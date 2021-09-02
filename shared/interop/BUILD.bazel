@@ -9,7 +9,7 @@ go_library(
     importpath = "github.com/prysmaticlabs/prysm/shared/interop",
     visibility = ["//visibility:public"],
     deps = [
-        "//beacon-chain/core/helpers:go_default_library",
+        "//beacon-chain/core:go_default_library",
         "//beacon-chain/core/state:go_default_library",
         "//beacon-chain/state/v1:go_default_library",
         "//proto/prysm/v1alpha1:go_default_library",

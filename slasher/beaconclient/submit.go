@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/beacon-chain/core"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/shared/sliceutil"
 	"github.com/sirupsen/logrus"
@@ -57,7 +57,7 @@ func (s *Service) subscribeDetectedAttesterSlashings(ctx context.Context, ch cha
 						"targetEpoch": slashing.Attestation_1.Data.Target.Epoch,
 						"indices":     slashableIndices,
 					}).Info("Found a valid attester slashing! Submitting to beacon node")
-				} else if strings.Contains(err.Error(), helpers.ErrSigFailedToVerify.Error()) {
+				} else if strings.Contains(err.Error(), core.ErrSigFailedToVerify.Error()) {
 					log.WithError(err).Errorf("Could not submit attester slashing with indices %v", slashableIndices)
 				} else if !strings.Contains(err.Error(), "could not slash") {
 					log.WithError(err).Errorf("Could not slash validators with indices %v", slashableIndices)

@@ -11,7 +11,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//beacon-chain/core:go_default_library",
-        "//beacon-chain/core/helpers:go_default_library",
         "//proto/prysm/v1alpha1:go_default_library",
         "//shared/attestationutil:go_default_library",
         "//shared/bls:go_default_library",
@@ -48,7 +47,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//beacon-chain/core:go_default_library",
-        "//beacon-chain/core/helpers:go_default_library",
         "//beacon-chain/p2p/types:go_default_library",
         "//proto/prysm/v1alpha1:go_default_library",
         "//shared/bls:go_default_library",
