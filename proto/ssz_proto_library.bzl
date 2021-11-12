@@ -51,6 +51,10 @@ def _ssz_proto_files_impl(ctx):
     else:
         fail("%s is an unknown configuration" % ctx.attr.config)
 
+#    print('0'*100)
+#    print(ctx.attr.config)
+#    print('0'*100)
+
     for src in ctx.attr.srcs:
         output = ctx.actions.declare_file(src.files.to_list()[0].basename)
         outputs.append(output)

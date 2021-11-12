@@ -32,7 +32,6 @@ proto_library(
         "p2p_messages.proto",
         ":ssz_proto_files",
         #        ":generated_swagger_proto",
-        "light_client.proto",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -187,6 +186,8 @@ ssz_proto_files(
         "beacon_block.proto",
         "beacon_state.proto",
         "sync_committee.proto",
+        "light_client.proto",
+
     ],
     config = select({
         "//conditions:default": "mainnet",
