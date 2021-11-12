@@ -25,6 +25,7 @@ func DefaultConfig(enableDebugRPCEndpoints bool, httpModules string) MuxConfig {
 			ethpbalpha.RegisterBeaconChainHandler,
 			ethpbalpha.RegisterBeaconNodeValidatorHandler,
 			ethpbalpha.RegisterHealthHandler,
+			ethpbalpha.RegisterLightClientHandler,
 		}
 		if enableDebugRPCEndpoints {
 			v1AlphaRegistrations = append(v1AlphaRegistrations, ethpbalpha.RegisterDebugHandler)
