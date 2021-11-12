@@ -2,6 +2,7 @@ package light
 
 import (
 	"context"
+	golog "log"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
@@ -33,12 +34,16 @@ func (s *Server) BestUpdates(ctx context.Context, req *ethpb.BestUpdatesRequest)
 
 // LatestUpdateFinalized GET /eth/v1alpha1/lightclient/latest_update_finalized/
 func (s *Server) LatestUpdateFinalized(ctx context.Context, _ *empty.Empty) (*ethpb.LightClientUpdate, error) {
+	golog.Println("hitting LatestUpdateFinalized")
 	update, err := s.Database.LightClientLatestFinalizedUpdate(ctx)
 	if errors.Is(err, kv.ErrNotFound) {
 		return nil, status.Error(codes.Internal, "No latest finalized update found")
 	} else if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not retrieve latest finalized update: %v", err)
 	}
+	//golog.Println(1 / 0)
+	//golog.Fatalln("fff")
+	golog.Println(update)
 	return update, nil
 }
 

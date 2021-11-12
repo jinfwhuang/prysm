@@ -32,24 +32,24 @@ option java_outer_classname = "LightClient";
 option java_package = "org.ethereum.eth.v1alpha1";
 option php_namespace = "Ethereum\\Eth\\v1alpha1";
 
-service LightClient {
-  rpc BestUpdates(BestUpdatesRequest) returns (BestUpdatesResponse) {
-    option (google.api.http) = {
-      post: "/eth/v1alpha1/lightclient/best_update",
-      body: "*"
-    };
-  }
-  rpc LatestUpdateFinalized(google.protobuf.Empty) returns (LightClientUpdate) {
-    option (google.api.http) = {
-      get: "/eth/v1alpha1/lightclient/latest_update_finalized",
-    };
-  }
-  rpc LatestUpdateNonFinalized(google.protobuf.Empty) returns (LightClientUpdate) {
-    option (google.api.http) = {
-      get: "/eth/v1alpha1/lightclient/latest_update_nonfinalized",
-    };
-  }
-}
+//service LightClient {
+//  rpc BestUpdates(BestUpdatesRequest) returns (BestUpdatesResponse) {
+//    option (google.api.http) = {
+//      post: "/eth/v1alpha1/lightclient/best_update",
+//      body: "*"
+//    };
+//  }
+//  rpc LatestUpdateFinalized(google.protobuf.Empty) returns (LightClientUpdate) {
+//    option (google.api.http) = {
+//      get: "/eth/v1alpha1/lightclient/latest_update_finalized",
+//    };
+//  }
+//  rpc LatestUpdateNonFinalized(google.protobuf.Empty) returns (LightClientUpdate) {
+//    option (google.api.http) = {
+//      get: "/eth/v1alpha1/lightclient/latest_update_nonfinalized",
+//    };
+//  }
+//}
 
 message BestUpdatesRequest {
   repeated uint64 sync_committee_periods = 1;
@@ -89,3 +89,6 @@ message LightClientFinalizedCheckpoint {
   ethereum.eth.v1alpha1.SyncCommittee next_sync_committee = 2;
   repeated bytes next_sync_committee_branch = 3 [(ethereum.eth.ext.ssz_size) = "5,32"];
 }
+
+// skip-sync
+
