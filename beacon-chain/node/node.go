@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	tmplog "log"
 	"math"
 	"os"
 	"os/signal"
@@ -542,8 +543,14 @@ func (b *BeaconNode) registerBlockchainService() error {
 		blockchain.WithStateGen(b.stateGen),
 		blockchain.WithSlasherAttestationsFeed(b.slasherAttestationsFeed),
 		blockchain.WithFinalizedStateAtStartUp(b.finalizedStateAtStartUp),
+		blockchain.WithLightClientUpdatesQueueSize(32), // TODO: jin propagate the option to configuration later
 	)
 	blockchainService, err := blockchain.NewService(b.ctx, opts...)
+
+	tmplog.Println("--------")
+	tmplog.Println(blockchainService) // TODO: jin
+	tmplog.Println("--------")
+
 	if err != nil {
 		return errors.Wrap(err, "could not register blockchain service")
 	}

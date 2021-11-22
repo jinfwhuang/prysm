@@ -10,6 +10,7 @@ import (
 
 type Server struct {
 	//Database iface.LightClientDatabase
+
 }
 
 //type LightClientServer interface {
