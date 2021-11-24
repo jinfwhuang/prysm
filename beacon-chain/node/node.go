@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	tmplog "log"
 	"math"
 	"os"
 	"os/signal"
@@ -29,6 +28,7 @@ import (
 	"github.com/prysmaticlabs/prysm/beacon-chain/forkchoice"
 	"github.com/prysmaticlabs/prysm/beacon-chain/forkchoice/protoarray"
 	"github.com/prysmaticlabs/prysm/beacon-chain/gateway"
+	"github.com/prysmaticlabs/prysm/beacon-chain/light"
 	"github.com/prysmaticlabs/prysm/beacon-chain/node/registration"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/attestations"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/slashings"
@@ -191,6 +191,10 @@ func New(cliCtx *cli.Context, opts ...Option) (*BeaconNode, error) {
 	}
 
 	if err := beacon.registerSyncService(); err != nil {
+		return nil, err
+	}
+
+	if err := beacon.registerLightClientService(); err != nil {
 		return nil, err
 	}
 
@@ -543,14 +547,8 @@ func (b *BeaconNode) registerBlockchainService() error {
 		blockchain.WithStateGen(b.stateGen),
 		blockchain.WithSlasherAttestationsFeed(b.slasherAttestationsFeed),
 		blockchain.WithFinalizedStateAtStartUp(b.finalizedStateAtStartUp),
-		blockchain.WithLightClientUpdatesQueueSize(32), // TODO: jin propagate the option to configuration later
 	)
 	blockchainService, err := blockchain.NewService(b.ctx, opts...)
-
-	tmplog.Println("--------")
-	tmplog.Println(blockchainService) // TODO: jin
-	tmplog.Println("--------")
-
 	if err != nil {
 		return errors.Wrap(err, "could not register blockchain service")
 	}
@@ -688,6 +686,11 @@ func (b *BeaconNode) registerRPCService() error {
 		return err
 	}
 
+	var lightService *light.Service
+	if err := b.services.FetchService(&lightService); err != nil {
+		return err
+	}
+
 	var slasherService *slasher.Service
 	if features.Get().EnableSlasher {
 		if err := b.services.FetchService(&slasherService); err != nil {
@@ -726,6 +729,7 @@ func (b *BeaconNode) registerRPCService() error {
 	}
 
 	p2pService := b.fetchP2P()
+	lightClientService := b.fetchLightClientService()
 	rpcService := rpc.NewService(b.ctx, &rpc.Config{
 		Host:                    host,
 		Port:                    port,
@@ -764,6 +768,7 @@ func (b *BeaconNode) registerRPCService() error {
 		StateGen:                b.stateGen,
 		EnableDebugRPCEndpoints: enableDebugRPCEndpoints,
 		MaxMsgSize:              maxMsgSize,
+		LightClientService:      lightClientService,
 	})
 
 	return b.services.RegisterService(rpcService)
@@ -872,4 +877,35 @@ func (b *BeaconNode) registerDeterminsticGenesisService() error {
 		return b.services.RegisterService(svc)
 	}
 	return nil
+}
+
+func (b *BeaconNode) registerLightClientService() error {
+	var chainService *blockchain.Service
+	if err := b.services.FetchService(&chainService); err != nil {
+		return err
+	}
+	var syncService *initialsync.Service
+	if err := b.services.FetchService(&syncService); err != nil {
+		return err
+	}
+	svc := light.New(b.ctx, &light.Config{
+		Database:                    b.db,
+		StateGen:                    b.stateGen,
+		HeadFetcher:                 chainService,
+		FinalizationFetcher:         chainService,
+		StateNotifier:               b,
+		TimeFetcher:                 chainService,
+		SyncChecker:                 syncService,
+		LightClientUpdatesQueueSize: 32, // TODO: jin; allowed this to be passed in from command line
+	})
+
+	return b.services.RegisterService(svc)
+}
+
+func (b *BeaconNode) fetchLightClientService() *light.Service {
+	var s *light.Service
+	if err := b.services.FetchService(&s); err != nil {
+		panic(err)
+	}
+	return s
 }

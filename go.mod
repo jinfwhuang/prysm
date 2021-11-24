@@ -16,11 +16,11 @@ require (
 	github.com/dgraph-io/ristretto v0.0.4-0.20210318174700-74754f61e018
 	github.com/dustin/go-humanize v1.0.0
 	github.com/emicklei/dot v0.11.0
-	// TODO: 
-	// - not sure if this is a good choice. We just need a simple FIFO queue; 
+	// TODO:
+	// - not sure if this is a good choice. We just need a simple FIFO queue;
 	// - do we need this to be concurrent?
 	// - Use a simple, first principle implementation + a mutex write for a single writer pattern
-	github.com/enriquebris/goconcurrentqueue v0.6.0 // indirect 
+	github.com/enriquebris/goconcurrentqueue v0.6.0 // indirect
 	github.com/ethereum/go-ethereum v1.10.10
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/ferranbt/fastssz v0.0.0-20210905181407-59cf6761a7d5
@@ -84,6 +84,7 @@ require (
 	github.com/prometheus/procfs v0.7.0 // indirect
 	github.com/prometheus/prom2json v1.3.0
 	github.com/prometheus/tsdb v0.10.0 // indirect
+	github.com/protolambda/ztyp v0.1.9 // indirect
 	github.com/prysmaticlabs/eth2-types v0.0.0-20210303084904-c9735a06829d
 	github.com/prysmaticlabs/go-bitfield v0.0.0-20210809151128-385d8c5e3fb7
 	github.com/prysmaticlabs/prombbolt v0.0.0-20210126082820-9b7adba6db7c

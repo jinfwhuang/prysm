@@ -20,6 +20,7 @@ import (
 	opfeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/operation"
 	statefeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/db"
+	lightservice "github.com/prysmaticlabs/prysm/beacon-chain/light"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/attestations"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/slashings"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/synccommittee"
@@ -109,6 +110,7 @@ type Config struct {
 	OperationNotifier       opfeed.Notifier
 	StateGen                *stategen.State
 	MaxMsgSize              int
+	LightClientService      *lightservice.Service
 }
 
 // NewService instantiates a new RPC service instance that will
@@ -280,9 +282,11 @@ func (s *Service) Start() {
 		VoluntaryExitsPool:      s.cfg.ExitPool,
 		V1Alpha1ValidatorServer: validatorServer,
 	}
+
 	lightClientServer := &light.Server{
-		//Database: s.cfg.BeaconDB,
+		LightClientService: s.cfg.LightClientService,
 	}
+
 	ethpbv1alpha1.RegisterLightClientServer(s.grpcServer, lightClientServer)
 	ethpbv1alpha1.RegisterNodeServer(s.grpcServer, nodeServer)
 	ethpbservice.RegisterBeaconNodeServer(s.grpcServer, nodeServerV1)

@@ -2,8 +2,6 @@ package blockchain
 
 import (
 	"context"
-	tmplog "log"
-
 	"github.com/pkg/errors"
 	types "github.com/prysmaticlabs/eth2-types"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/feed"
@@ -63,10 +61,10 @@ func (s *Service) ReceiveBlock(ctx context.Context, block block.SignedBeaconBloc
 	// Log state transition data.
 	logStateTransitionData(blockCopy.Block())
 
-	// Maintain a queue of LightClientUpdates
-	if err := s.buildLightClientUpdates(ctx, blockCopy); err != nil {
-		return err
-	}
+	//// xxx: jin Maintain a queue of LightClientUpdates
+	//if err := s.buildLightClientUpdates(ctx, blockCopy); err != nil {
+	//	return err
+	//}
 
 	return nil
 }
@@ -106,11 +104,11 @@ func (s *Service) ReceiveBlockBatch(ctx context.Context, blocks []block.SignedBe
 		// Reports on blockCopy and fork choice metrics.
 		reportSlotMetrics(blockCopy.Block().Slot(), s.HeadSlot(), s.CurrentSlot(), s.finalizedCheckpt)
 
-		// Maintain a queue of LightClientUpdates
-		tmplog.Println(blockCopy)
-		if err := s.buildLightClientUpdates(ctx, blockCopy); err != nil {
-			return err
-		}
+		//// Maintain a queue of LightClientUpdates
+		//tmplog.Println(blockCopy)
+		//if err := s.buildLightClientUpdates(ctx, blockCopy); err != nil {
+		//	return err
+		//}
 	}
 
 	if err := s.cfg.BeaconDB.SaveBlocks(ctx, s.getInitSyncBlocks()); err != nil {

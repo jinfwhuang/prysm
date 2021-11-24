@@ -108,9 +108,10 @@ func NewService(ctx context.Context, opts ...Option) (*Service, error) {
 		if err := opt(srv); err != nil {
 			return nil, err
 		}
-		tmplog.Println(&opt)
 	}
+	tmplog.Println("-----")
 	tmplog.Println(srv.queue)
+	tmplog.Println("-----")
 	var err error
 	if srv.justifiedBalances == nil {
 		srv.justifiedBalances, err = newStateBalanceCache(srv.cfg.StateGen)
@@ -122,10 +123,15 @@ func NewService(ctx context.Context, opts ...Option) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Create a queue for light client updates
 	srv.queue = goconcurrentqueue.NewFixedFIFO(srv.cfg.LightClientUpdatesQueueSize)
 	if err != nil {
 		return nil, err
 	}
+
+	tmplog.Println("-----")
+	tmplog.Println(srv.queue)
+	tmplog.Println("-----")
 
 	return srv, nil
 }

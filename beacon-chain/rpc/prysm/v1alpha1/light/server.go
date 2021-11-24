@@ -2,15 +2,16 @@ package light
 
 import (
 	"context"
+	"github.com/prysmaticlabs/prysm/beacon-chain/light"
 	tmplog "log"
+	"math/rand"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 )
 
 type Server struct {
-	//Database iface.LightClientDatabase
-
+	LightClientService *light.Service
 }
 
 //type LightClientServer interface {
@@ -19,20 +20,23 @@ type Server struct {
 //}
 func init() {
 	tmplog.SetFlags(tmplog.Llongfile)
+
 }
 
 func (s *Server) Updates(ctx context.Context, _ *empty.Empty) (*ethpb.UpdatesResponse, error) {
-	tmplog.Println("requesting for updates")
-	updates := make([]*ethpb.LightClientUpdate, 0)
-	//for _, period := range req.SyncCommitteePeriods {
-	//	update, err := s.Database.LightClientBestUpdateForPeriod(ctx, period)
-	//	if errors.Is(err, kv.ErrNotFound) {
-	//		continue
-	//	} else if err != nil {
-	//		return nil, status.Errorf(codes.Internal, "Could not retrieve best update for %d: %v", period, err)
-	//	}
-	//	updates = append(updates, update)
-	//}
+	q := s.LightClientService.Queue
+	size := rand.Intn(q.Len())
+	if size == 0 && q.Len() > 0 {
+		size = 1
+	}
+	tmplog.Println("requesting size", size, "q size", q.Len(), "q cap", q.Cap())
+
+	updates := make([]*ethpb.LightClientUpdate, size)
+	_updates := q.Peek(size)
+	for i := 0; i < size; i++ {
+		updates[i] = _updates[i].(*ethpb.LightClientUpdate)
+	}
+	tmplog.Println("found updats", len(updates))
 	return &ethpb.UpdatesResponse{Updates: updates}, nil
 }
 
