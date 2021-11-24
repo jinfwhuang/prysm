@@ -5,8 +5,6 @@ package blockchain
 import (
 	"context"
 	"fmt"
-	"github.com/enriquebris/goconcurrentqueue"
-	tmplog "log"
 	"runtime"
 	"sync"
 	"time"
@@ -67,28 +65,26 @@ type Service struct {
 	//justifiedBalances     []uint64
 	justifiedBalances *stateBalanceCache
 	wsVerifier        *WeakSubjectivityVerifier
-	queue             goconcurrentqueue.Queue
 }
 
 // config options for the service.
 type config struct {
-	BeaconBlockBuf              int
-	ChainStartFetcher           powchain.ChainStartFetcher
-	BeaconDB                    db.HeadAccessDatabase
-	DepositCache                *depositcache.DepositCache
-	AttPool                     attestations.Pool
-	ExitPool                    voluntaryexits.PoolManager
-	SlashingPool                slashings.PoolManager
-	P2p                         p2p.Broadcaster
-	MaxRoutines                 int
-	StateNotifier               statefeed.Notifier
-	ForkChoiceStore             f.ForkChoicer
-	AttService                  *attestations.Service
-	StateGen                    *stategen.State
-	SlasherAttestationsFeed     *event.Feed
-	WeakSubjectivityCheckpt     *ethpb.Checkpoint
-	FinalizedStateAtStartUp     state.BeaconState
-	LightClientUpdatesQueueSize int
+	BeaconBlockBuf          int
+	ChainStartFetcher       powchain.ChainStartFetcher
+	BeaconDB                db.HeadAccessDatabase
+	DepositCache            *depositcache.DepositCache
+	AttPool                 attestations.Pool
+	ExitPool                voluntaryexits.PoolManager
+	SlashingPool            slashings.PoolManager
+	P2p                     p2p.Broadcaster
+	MaxRoutines             int
+	StateNotifier           statefeed.Notifier
+	ForkChoiceStore         f.ForkChoicer
+	AttService              *attestations.Service
+	StateGen                *stategen.State
+	SlasherAttestationsFeed *event.Feed
+	WeakSubjectivityCheckpt *ethpb.Checkpoint
+	FinalizedStateAtStartUp state.BeaconState
 }
 
 // NewService instantiates a new block service instance that will
@@ -103,15 +99,11 @@ func NewService(ctx context.Context, opts ...Option) (*Service, error) {
 		initSyncBlocks:       make(map[[32]byte]block.SignedBeaconBlock),
 		cfg:                  &config{},
 	}
-	tmplog.Println(srv.queue)
 	for _, opt := range opts {
 		if err := opt(srv); err != nil {
 			return nil, err
 		}
 	}
-	tmplog.Println("-----")
-	tmplog.Println(srv.queue)
-	tmplog.Println("-----")
 	var err error
 	if srv.justifiedBalances == nil {
 		srv.justifiedBalances, err = newStateBalanceCache(srv.cfg.StateGen)
@@ -123,16 +115,6 @@ func NewService(ctx context.Context, opts ...Option) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Create a queue for light client updates
-	srv.queue = goconcurrentqueue.NewFixedFIFO(srv.cfg.LightClientUpdatesQueueSize)
-	if err != nil {
-		return nil, err
-	}
-
-	tmplog.Println("-----")
-	tmplog.Println(srv.queue)
-	tmplog.Println("-----")
-
 	return srv, nil
 }
 

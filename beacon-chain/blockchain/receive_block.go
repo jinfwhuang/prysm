@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"context"
+
 	"github.com/pkg/errors"
 	types "github.com/prysmaticlabs/eth2-types"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/feed"
@@ -23,8 +24,8 @@ type BlockReceiver interface {
 	HasInitSyncBlock(root [32]byte) bool
 }
 
-// ReceiveBlock is a function that defines the operations (minus pubsub)
-// that are performed on blocks that is received from regular sync service. The operations consist of:
+// ReceiveBlock is a function that defines the the operations (minus pubsub)
+// that are performed on blocks that is received from regular sync service. The operations consists of:
 //   1. Validate block, apply state transition and update check points
 //   2. Apply fork choice to the processed block
 //   3. Save latest head info
@@ -60,11 +61,6 @@ func (s *Service) ReceiveBlock(ctx context.Context, block block.SignedBeaconBloc
 	}
 	// Log state transition data.
 	logStateTransitionData(blockCopy.Block())
-
-	//// xxx: jin Maintain a queue of LightClientUpdates
-	//if err := s.buildLightClientUpdates(ctx, blockCopy); err != nil {
-	//	return err
-	//}
 
 	return nil
 }
@@ -103,12 +99,6 @@ func (s *Service) ReceiveBlockBatch(ctx context.Context, blocks []block.SignedBe
 
 		// Reports on blockCopy and fork choice metrics.
 		reportSlotMetrics(blockCopy.Block().Slot(), s.HeadSlot(), s.CurrentSlot(), s.finalizedCheckpt)
-
-		//// Maintain a queue of LightClientUpdates
-		//tmplog.Println(blockCopy)
-		//if err := s.buildLightClientUpdates(ctx, blockCopy); err != nil {
-		//	return err
-		//}
 	}
 
 	if err := s.cfg.BeaconDB.SaveBlocks(ctx, s.getInitSyncBlocks()); err != nil {

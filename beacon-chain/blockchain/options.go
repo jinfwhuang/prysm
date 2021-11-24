@@ -14,7 +14,6 @@ import (
 	"github.com/prysmaticlabs/prysm/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state/stategen"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
-	tmplog "log"
 )
 
 type Option func(s *Service) error
@@ -142,15 +141,6 @@ func withStateBalanceCache(c *stateBalanceCache) Option {
 func WithFinalizedStateAtStartUp(st state.BeaconState) Option {
 	return func(s *Service) error {
 		s.cfg.FinalizedStateAtStartUp = st
-		return nil
-	}
-}
-
-// xxx
-func WithLightClientUpdatesQueueSize(size int) Option {
-	return func(s *Service) error {
-		s.cfg.LightClientUpdatesQueueSize = size
-		tmplog.Println(s.cfg.LightClientUpdatesQueueSize)
 		return nil
 	}
 }
