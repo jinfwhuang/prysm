@@ -35,8 +35,10 @@ func (s *Server) Updates(ctx context.Context, _ *empty.Empty) (*ethpb.UpdatesRes
 	_updates := q.Peek(size)
 	for i := 0; i < size; i++ {
 		updates[i] = _updates[i].(*ethpb.LightClientUpdate)
+		root, _ := updates[i].HashTreeRoot()
+		tmplog.Println(root)
 	}
-	tmplog.Println("found updats", len(updates))
+	tmplog.Println("responding with updates", len(updates))
 	return &ethpb.UpdatesResponse{Updates: updates}, nil
 }
 

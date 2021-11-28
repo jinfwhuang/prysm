@@ -101,6 +101,7 @@ ssz_gen_marshal(
         "SigningData",
         "SyncCommittee",
         "SyncAggregatorSelectionData",
+        "LightClientUpdate",
     ],
 )
 

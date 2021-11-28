@@ -1,15 +1,18 @@
-package ssz
+package ztype
 
 import (
 	"bytes"
+	"github.com/protolambda/ztyp/codec"
+	//"bytes"
 	"sort"
 
-	"github.com/pkg/errors"
-	"github.com/protolambda/ztyp/codec"
+	//"github.com/pkg/errors"
+	//"github.com/protolambda/ztyp/codec"
 	"github.com/protolambda/ztyp/tree"
 	"github.com/protolambda/ztyp/view"
-	"github.com/prysmaticlabs/prysm/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
+	//"github.com/prysmaticlabs/prysm/beacon-chain/state"
+	//"github.com/prysmaticlabs/prysm/encoding/bytesutil"
+	v2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
 )
 
 var (
@@ -62,84 +65,104 @@ var (
 		{"aggregate_pubkey", BLSPubkeyType},
 	})
 	BeaconStateAltairType = view.ContainerType("BeaconStateAltair", []view.FieldDef{
-		{"genesis_time", view.Uint64Type},
+		{"genesis_time", view.Uint64Type}, // 0
 		{"genesis_validators_root", view.RootType},
 		{"slot", view.Uint64Type},
 		{"fork", ForkType},
 		{"latest_block_header", BeaconBlockHeaderType},
-		{"block_roots", BlockRootsType},
+		{"block_roots", BlockRootsType}, // 5
 		{"state_roots", StateRootsType},
 		{"historical_roots", HistoricalRootsType},
 		{"eth1_data", Eth1DataType},
 		{"eth1_data_votes", Eth1DataVotesType},
-		{"eth1_deposit_index", view.Uint64Type},
+		{"eth1_deposit_index", view.Uint64Type}, // 10
 		{"validators", ValidatorsType},
 		{"balances", BalancesType},
 		{"randao_mixes", RandaoMixesType},
 		{"slashings", SlashingsType},
-		{"previous_epoch_participation", ParticipationType},
+		{"previous_epoch_participation", ParticipationType}, // 15
 		{"current_epoch_participation", ParticipationType},
 		{"justification_bits", JustificationBitsType},
 		{"previous_justified_checkpoint", CheckpointType},
 		{"current_justified_checkpoint", CheckpointType},
-		{"finalized_checkpoint", CheckpointType},
+		{"finalized_checkpoint", CheckpointType}, // 20
 		{"inactivity_scores", InactivityScoresType},
 		{"current_sync_committee", SyncCommitteeType},
-		{"next_sync_committee", SyncCommitteeType},
+		{"next_sync_committee", SyncCommitteeType}, // 23
 	})
 )
 
-type TreeBackedState struct {
-	beaconState view.View
+type ZType interface {
+	HashTreeRoot() tree.Root
+	SszSerialize() []byte
+	Proof(index tree.Gindex64) (leave tree.Root, branch [][]byte)
+	Verify(leave tree.Root, branch [][]byte, index tree.Gindex64, root tree.Root) bool
 }
 
-func NewTreeBackedState(beaconState state.BeaconState) (*TreeBackedState, error) {
-	enc, err := beaconState.MarshalSSZ()
+type TreeBaseBeaconStateAltair struct {
+	//def  view.ContainerTypeDef
+	view *view.ContainerView
+}
+
+func NewTreeBaseBeaconStateAltair(sszBytes []byte) *TreeBaseBeaconStateAltair {
+	dec := codec.NewDecodingReader(bytes.NewReader(sszBytes), uint64(len(sszBytes)))
+	stateView, err := BeaconStateAltairType.Deserialize(dec)
+
+	//view.View()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	dec := codec.NewDecodingReader(bytes.NewReader(enc), uint64(len(enc)))
-	treeBacked, err := BeaconStateAltairType.Deserialize(dec)
+	//cc := a.(*view.ContainerView)
+	//
+	return &TreeBaseBeaconStateAltair{
+		view: stateView.(*view.ContainerView),
+	}
+}
+
+func NewTreeBackedState(state v2.BeaconState) *TreeBaseBeaconStateAltair {
+	ser, err := state.MarshalSSZ()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return &TreeBackedState{beaconState: treeBacked}, nil
+	reader := codec.NewDecodingReader(bytes.NewReader(ser), uint64(len(ser)))
+	stateView, err := BeaconStateAltairType.Deserialize(reader)
+
+	return &TreeBaseBeaconStateAltair{
+		view: stateView.(*view.ContainerView),
+	}
 }
 
-func VerifyProof(root [32]byte, proof [][]byte, leaf tree.Root, generalizedIndex tree.Gindex64) bool {
-	h := leaf
-	hFn := tree.GetHashFn()
-	idx := generalizedIndex
-	for _, elem := range proof {
-		if idx%2 == 0 {
-			h = hFn(h, bytesutil.ToBytes32(elem))
-		} else {
-			h = hFn(bytesutil.ToBytes32(elem), h)
-		}
-		idx = idx / 2
-	}
-	return h == root
+// GetGIndex Get the generalized index of the field
+func (obj *TreeBaseBeaconStateAltair) GetGIndex(fieldIndex uint64) tree.Gindex64 {
+	return 0
 }
 
-func (tb *TreeBackedState) View() view.View {
-	return tb.beaconState
+func (obj *TreeBaseBeaconStateAltair) HashTreeRoot() tree.Root {
+	return [32]byte{}
 }
 
-func (tb *TreeBackedState) Proof(
-	fieldIndex uint64,
-) (proof [][]byte, generalizedIdx tree.Gindex64, err error) {
-	cont, ok := tb.beaconState.(*view.ContainerView)
-	if !ok {
-		err = errors.New("not a container")
-		return
-	}
-	depth := tree.CoverDepth(cont.FieldCount())
-	generalizedIdx, err = tree.ToGindex64(fieldIndex, depth)
-	if err != nil {
-		return
-	}
+func (obj *TreeBaseBeaconStateAltair) SszSerialize() []byte {
+	return nil
+}
+
+/*
+def verify_merkle_proof(leaf: Bytes32, proof: Sequence[Bytes32], index: GeneralizedIndex, root: Root) -> bool:
+    return calculate_merkle_root(leaf, proof, index) == root
+*/
+func (obj *TreeBaseBeaconStateAltair) Verify(leave tree.Root, branch [][]byte, index tree.Gindex64, root tree.Root) bool {
+	panic("not implemented")
+}
+
+func (obj *TreeBaseBeaconStateAltair) Proof(index tree.Gindex64) (leave tree.Root, branch [][]byte) {
+	// TODO: jin fix the type assumption
+	//depth := tree.CoverDepth(obj.view.FieldCount())
+	//index
+	//generalizedIdx, _ = tree.ToGindex64(fieldIndex, depth)
+	//if err != nil {
+	//	return
+	//}
 	leaves := make(map[tree.Gindex64]struct{})
-	leaves[generalizedIdx] = struct{}{}
+	leaves[index] = struct{}{}
 	leavesSorted := make([]tree.Gindex64, 0, len(leaves))
 	for g := range leaves {
 		leavesSorted = append(leavesSorted, g)
@@ -180,18 +203,18 @@ func (tb *TreeBackedState) Proof(
 		return witnessSorted[i] < witnessSorted[j]
 	})
 
-	node := tb.beaconState.Backing()
+	node := obj.view.BackingNode
 	hFn := tree.GetHashFn()
-	proof = make([][]byte, 0, len(witnessSorted))
+	branch = make([][]byte, 0, len(witnessSorted))
 	for i := len(witnessSorted) - 1; i >= 0; i-- {
 		g := witnessSorted[i]
-		n, err2 := node.Getter(g)
-		if err2 != nil {
-			err = err2
-			return
+		n, err := node.Getter(g)
+		if err != nil {
+			panic(err)
 		}
 		root := n.MerkleRoot(hFn)
-		proof = append(proof, root[:])
+		branch = append(branch, root[:])
 	}
-	return
+	return [32]byte{}, branch
+	//return nil, 0
 }
