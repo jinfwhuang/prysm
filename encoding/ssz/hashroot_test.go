@@ -52,7 +52,7 @@ func toHex(bytearray []byte) string {
 //}
 
 func Test_DifferentMarshallSsz(t *testing.T) {
-	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/state/560c65172de2cab5aa9c41b0801fbfafb25fbaef.ssz"
+	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/state/aafc599c3a8980bc4daa867ee2e8a52a88219761.ssz"
 
 	bytearray1, err := file.ReadFileAsBytes(filename)
 	require.NoError(t, err)
@@ -82,7 +82,7 @@ func Test_DifferentMarshallSsz(t *testing.T) {
 
 func Test_DifferentHashRoot(t *testing.T) {
 	ctx := context.Background()
-	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/state/560c65172de2cab5aa9c41b0801fbfafb25fbaef.ssz"
+	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/state/aafc599c3a8980bc4daa867ee2e8a52a88219761.ssz"
 	bytearray, err := file.ReadFileAsBytes(filename)
 	if err != nil {
 		panic(err)

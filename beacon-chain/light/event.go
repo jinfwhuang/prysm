@@ -6,6 +6,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/feed"
 	statefeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/state"
+	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
+
 	//vv1 "github.com/prysmaticlabs/prysm/beacon-chain/state/v1"
 	statev2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
 	v1 "github.com/prysmaticlabs/prysm/proto/eth/v1"
@@ -20,6 +22,7 @@ import (
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1/block"
 	//"github.com/prysmaticlabs/prysm/time/slots"
+	stateV2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
 	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype/utils"
 )
 
@@ -210,9 +213,12 @@ func mkBeaconStateAltair(bytearray []byte) state.BeaconState {
 }
 
 // Use the blocks to build light-client-updates
-func (s *Service) buildLightClientUpdates(ctx context.Context, block block.SignedBeaconBlock, state state.BeaconStateAltair) error {
+func (s *Service) buildLightClientUpdates(ctx context.Context, block block.SignedBeaconBlock, state state.BeaconState) error {
 	//verify_serder_same_root(ctx, state)
+	_state := state.(*statev2.BeaconState)
+	ztypeState := ztype.FromBeaconState(_state)
 
+	//state state.BeaconStateAltair
 	// Header
 	header, err := block.Header()
 	if err != nil {
@@ -237,6 +243,13 @@ func (s *Service) buildLightClientUpdates(ctx context.Context, block block.Signe
 	if err != nil {
 		return err
 	}
+	// TODO: Verify this branch ??
+	nextSyncCommitteeBranch := ztypeState.GetBranch(ztypeState.GetGIndex(23))
+
+	//{"finalized_checkpoint", CheckpointType}, // 20
+
+	//gIndex := ztypeState.GetGIndex()
+	//finalityBranch := ztypeState.
 	// TODO: ?? how to build finality header branch?
 
 	//nextSyncCommittee, err := block.Block().Body().SyncAggregate()
@@ -245,6 +258,9 @@ func (s *Service) buildLightClientUpdates(ctx context.Context, block block.Signe
 		return err
 	}
 
+	// TODO: Verify this branch ??
+	nextSyncCommitteeBranch := ztypeState.GetBranch(ztypeState.GetGIndex(23))
+
 	update := &ethpb.LightClientUpdate{
 		//Header                  *BeaconBlockHeader                                `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
 		Header: header.Header,
@@ -252,10 +268,12 @@ func (s *Service) buildLightClientUpdates(ctx context.Context, block block.Signe
 		//NextSyncCommittee       *SyncCommittee                                    `protobuf:"bytes,2,opt,name=next_sync_committee,json=nextSyncCommittee,proto3" json:"next_sync_committee,omitempty"`
 		//NextSyncCommitteeBranch [][]byte                                          `protobuf:"bytes,3,rep,name=next_sync_committee_branch,json=nextSyncCommitteeBranch,proto3" json:"next_sync_committee_branch,omitempty" ssz-size:"5,32"`
 		NextSyncCommittee: nextCom,
+		//NextSyncCommitteeBranch:
 
 		//FinalityHeader          *BeaconBlockHeader                                `protobuf:"bytes,4,opt,name=finality_header,json=finalityHeader,proto3" json:"finality_header,omitempty"`
 		//FinalityBranch          [][]byte                                          `protobuf:"bytes,5,rep,name=finality_branch,json=finalityBranch,proto3" json:"finality_branch,omitempty" ssz-size:"6,32"`
 		FinalityHeader: finalityHeader.Header,
+		FinalityBranch: nextSyncCommitteeBranch,
 
 		//SyncCommitteeBits       github_com_prysmaticlabs_go_bitfield.Bitvector512 `protobuf:"bytes,6,opt,name=sync_committee_bits,json=syncCommitteeBits,proto3" json:"sync_committee_bits,omitempty" cast-type:"github.com/prysmaticlabs/go-bitfield.Bitvector512" ssz-size:"64"`
 		//SyncCommitteeSignature  []byte                                            `protobuf:"bytes,7,opt,name=sync_committee_signature,json=syncCommitteeSignature,proto3" json:"sync_committee_signature,omitempty" ssz-size:"96"`
