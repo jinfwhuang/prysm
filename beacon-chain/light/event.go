@@ -21,8 +21,7 @@ import (
 	//"github.com/prysmaticlabs/prysm/network/forks"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1/block"
-	//"github.com/prysmaticlabs/prysm/time/slots"
-	stateV2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
+
 	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype/utils"
 )
 
@@ -230,8 +229,7 @@ func (s *Service) buildLightClientUpdates(ctx context.Context, block block.Signe
 	if err != nil {
 		return err
 	}
-	//tmplog.Println(nextCom)
-	// TODO: ?? how to build committeebranch?
+	nextSyncCommitteeBranch := ztypeState.GetBranch(ztypeState.GetGIndex(23))
 
 	fCheckpoint := state.FinalizedCheckpoint()
 
@@ -243,8 +241,8 @@ func (s *Service) buildLightClientUpdates(ctx context.Context, block block.Signe
 	if err != nil {
 		return err
 	}
-	// TODO: Verify this branch ??
-	nextSyncCommitteeBranch := ztypeState.GetBranch(ztypeState.GetGIndex(23))
+	//// TODO: Verify this branch ??
+	//finalityHeaderBranch := ztypeState.GetBranch(ztypeState.GetGIndex(23))
 
 	//{"finalized_checkpoint", CheckpointType}, // 20
 
@@ -257,9 +255,6 @@ func (s *Service) buildLightClientUpdates(ctx context.Context, block block.Signe
 	if err != nil {
 		return err
 	}
-
-	// TODO: Verify this branch ??
-	nextSyncCommitteeBranch := ztypeState.GetBranch(ztypeState.GetGIndex(23))
 
 	update := &ethpb.LightClientUpdate{
 		//Header                  *BeaconBlockHeader                                `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`

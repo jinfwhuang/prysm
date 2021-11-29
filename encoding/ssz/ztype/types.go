@@ -3,20 +3,13 @@ package ztype
 import (
 	"bytes"
 	"github.com/protolambda/ztyp/codec"
+	"github.com/protolambda/ztyp/tree"
+	"github.com/protolambda/ztyp/view"
+	stateV2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
 	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	tmplog "log"
-
-	//"bytes"
 	"sort"
-
-	//"github.com/pkg/errors"
-	//"github.com/protolambda/ztyp/codec"
-	"github.com/protolambda/ztyp/tree"
-	"github.com/protolambda/ztyp/view"
-	//"github.com/prysmaticlabs/prysm/beacon-chain/state"
-	//"github.com/prysmaticlabs/prysm/encoding/bytesutil"
-	stateV2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
 )
 
 var (
@@ -148,12 +141,40 @@ func FromBeaconState(state *stateV2.BeaconState) *ZtypBeaconStateAltair {
 	}
 }
 
+//// GetGIndex Get the generalized index of the field
+//func (s *ZtypBeaconStateAltair) GetGIndex(fieldIndex uint64) tree.Gindex64 {
+//	depth := tree.CoverDepth(s.View.FieldCount())
+//	gIndex, err := tree.ToGindex64(fieldIndex, depth)
+//	PanicErr(err)
+//	return gIndex
+//}
+
 // GetGIndex Get the generalized index of the field
-func (s *ZtypBeaconStateAltair) GetGIndex(fieldIndex uint64) tree.Gindex64 {
-	depth := tree.CoverDepth(s.View.FieldCount())
-	gIndex, err := tree.ToGindex64(fieldIndex, depth)
-	PanicErr(err)
-	return gIndex
+func (s *ZtypBeaconStateAltair) GetGIndex(fieldIndices ...uint64) tree.Gindex64 {
+	var gindices []tree.Gindex64
+	def := s.View.ContainerTypeDef // TODO: hack, assuming that all the objects in the path is ContainerTypeDef
+	for _, fieldIndex := range fieldIndices {
+		tmplog.Println(def)
+		depth := tree.CoverDepth(def.FieldCount())
+		gIndex, err := tree.ToGindex64(fieldIndex, depth)
+		PanicErr(err)
+		gindices = append(gindices, gIndex)
+
+		field := def.Fields[fieldIndex]
+		if len(gindices) == len(fieldIndices) {
+			// This allows the last field index to refer to a field that is not ContainerType
+			break
+		}
+
+		switch v := field.Type.(type) {
+		case *view.ContainerTypeDef:
+			def = v
+		default:
+			tmplog.Println(field)
+			panic("the field is not a containertype")
+		}
+	}
+	return ConcatGeneralizedIndices(gindices...)
 }
 
 func (s *ZtypBeaconStateAltair) HashTreeRoot() tree.Root {

@@ -4,24 +4,19 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
-	"github.com/prysmaticlabs/prysm/testing/require"
-	"math/rand"
-
-	///Users/jin/code/repos/prysm/beacon-chain/state/v2
-
-	//"bytes"
-	//"github.com/protolambda/ztyp/codec"
-	//"github.com/prysmaticlabs/go-bitfield"
-	//"github.com/prysmaticlabs/prysm/beacon-chain/state"
-	//"github.com/prysmaticlabs/prysm/config/params"
 	"github.com/prysmaticlabs/prysm/io/file"
-	//"github.com/prysmaticlabs/prysm/testing/util"
+	"github.com/prysmaticlabs/prysm/testing/require"
 	tmplog "log"
+	"math/rand"
 	"testing"
 )
 
 func init() {
 	tmplog.SetFlags(tmplog.Llongfile)
+}
+
+func hex0x(b []byte) string {
+	return "0x" + hex.EncodeToString(b[:])
 }
 
 func hashBytes(b []byte) string {
@@ -34,18 +29,7 @@ func TestAA(t *testing.T) {
 	tmplog.Println("fff")
 }
 
-//func Test_StateConversion(t *testing.T) {
-//	tmplog.Println("fff")
-//	//st, _ := util.NewBeaconState()
-//	//dec := codec.NewDecodingReader(bytes.NewReader(data), uint64(len(data)))
-//	//convertState()
-//}
-
 func Test_HashTreeRoot(t *testing.T) {
-	//st, _ := util.NewBeaconState()
-	//dec := codec.NewDecodingReader(bytes.NewReader(data), uint64(len(data)))
-	//convertState()
-	//filename := "/Users/jin/code/repos/prysm/tmp/ssz/statev1/24691.ssz" // The fastssz hash is: 62113.ssz
 	ctx := context.Background()
 	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/state/aafc599c3a8980bc4daa867ee2e8a52a88219761.ssz"
 	sszbytes, err := file.ReadFileAsBytes(filename)
@@ -72,7 +56,6 @@ func Test_HashTreeRoot(t *testing.T) {
 }
 
 func Test_SszSerialize(t *testing.T) {
-	//ctx := context.Background()
 	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/state/aafc599c3a8980bc4daa867ee2e8a52a88219761.ssz"
 	sszbytes, err := file.ReadFileAsBytes(filename)
 	require.NoError(t, err)
@@ -127,9 +110,37 @@ func Test_Proof(t *testing.T) {
 	leaf := state.GetLeaf(gIndex)
 	branch := state.GetBranch(gIndex)
 
-	tmplog.Println(root)
-	tmplog.Println(gIndex)
-	tmplog.Println(leaf)
-	tmplog.Println(branch)
+	require.Equal(t, Verify(root, gIndex, leaf, branch), true)
+}
 
+func Test_FinalityCheckpointBranch(t *testing.T) {
+	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/state/aafc599c3a8980bc4daa867ee2e8a52a88219761.ssz"
+	sszbytes, err := file.ReadFileAsBytes(filename)
+	require.NoError(t, err)
+	state := FromSszBytes(sszbytes)
+
+	root := state.HashTreeRoot()
+	gIndex := state.GetGIndex(20) // finalized_checkpoint 20
+	leaf := state.GetLeaf(gIndex)
+	branch := state.GetBranch(gIndex)
+
+	require.Equal(t, Verify(root, gIndex, leaf, branch), true)
+}
+
+func Test_FinalityHeaderBranch(t *testing.T) {
+	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/state/aafc599c3a8980bc4daa867ee2e8a52a88219761.ssz"
+	sszbytes, err := file.ReadFileAsBytes(filename)
+	require.NoError(t, err)
+	state := FromSszBytes(sszbytes)
+
+	root := state.HashTreeRoot()
+	gIndex := state.GetGIndex(20, 1) // finalized_checkpoint (20), root (1)
+	leaf := state.GetLeaf(gIndex)
+	branch := state.GetBranch(gIndex)
+
+	require.Equal(t, Verify(root, gIndex, leaf, branch), true)
+	require.Equal(t, leaf.String(), hex0x(state.State.FinalizedCheckpoint().Root)) // The merkle root of the leaf is the leaf itself.
+
+	tmplog.Println("leaf                ", leaf)
+	tmplog.Println("finalized checkpoint", hex0x(state.State.FinalizedCheckpoint().Root))
 }

@@ -5,18 +5,9 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	v2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
-	"github.com/prysmaticlabs/prysm/testing/require"
-
-	///Users/jin/code/repos/prysm/beacon-chain/state/v2
-
-	//"bytes"
-	//"github.com/protolambda/ztyp/codec"
-	//"github.com/prysmaticlabs/go-bitfield"
-	//"github.com/prysmaticlabs/prysm/beacon-chain/state"
-	//"github.com/prysmaticlabs/prysm/config/params"
 	"github.com/prysmaticlabs/prysm/io/file"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
-	//"github.com/prysmaticlabs/prysm/testing/util"
+	"github.com/prysmaticlabs/prysm/testing/require"
 	tmplog "log"
 	"testing"
 )
@@ -34,22 +25,6 @@ func hashBytes(b []byte) string {
 func toHex(bytearray []byte) string {
 	return hex.EncodeToString(bytearray)
 }
-
-//func printInfo(bytearray []byte, root [32]byte) {
-//	filename := "./tmp/ssz/statev1/" + hashBytes(bytearray) + ".ssz"
-//	err := os.WriteFile(filename, bytearray, 0666)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	contentHash := utils.HashBytes(bytearray)
-//
-//	tmplog.Println("----------------------------")
-//	tmplog.Println("wrote a ssz file:", filename)
-//	tmplog.Println("content hash:", contentHash)
-//	tmplog.Println("root hash", hex.EncodeToString(root[:]))
-//	tmplog.Println("----------------------------")
-//}
 
 func Test_DifferentMarshallSsz(t *testing.T) {
 	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/state/aafc599c3a8980bc4daa867ee2e8a52a88219761.ssz"
