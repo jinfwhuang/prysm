@@ -147,7 +147,6 @@ type Database interface {
 	io.Closer
 	backup.BackupExporter
 	HeadAccessDatabase
-
 	DatabasePath() string
 	ClearDB() error
 }

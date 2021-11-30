@@ -13,6 +13,7 @@ go_library(
         "finalized_block_roots.go",
         "genesis.go",
         "kv.go",
+        "light.go",
         "log.go",
         "migration.go",
         "migration_archived_index.go",
