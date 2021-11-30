@@ -154,7 +154,7 @@ func (s *ZtypBeaconStateAltair) GetGIndex(fieldIndices ...uint64) tree.Gindex64 
 	var gindices []tree.Gindex64
 	def := s.View.ContainerTypeDef // TODO: hack, assuming that all the objects in the path is ContainerTypeDef
 	for _, fieldIndex := range fieldIndices {
-		tmplog.Println(def)
+		//tmplog.Println(def)
 		depth := tree.CoverDepth(def.FieldCount())
 		gIndex, err := tree.ToGindex64(fieldIndex, depth)
 		PanicErr(err)
@@ -205,8 +205,8 @@ func Verify(root tree.Root, gIndex tree.Gindex64, leaf tree.Root, branch [][]byt
 		}
 		idx = idx / 2
 	}
-	tmplog.Println(h)
-	tmplog.Println(root)
+	//tmplog.Println(h)
+	//tmplog.Println(root)
 	return h == root
 }
 

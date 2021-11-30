@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
 	"github.com/prysmaticlabs/prysm/io/file"
+	"github.com/prysmaticlabs/prysm/proto/eth/v2"
 	"github.com/prysmaticlabs/prysm/testing/require"
 	"testing"
 
@@ -21,8 +22,12 @@ func hashBytes(b []byte) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func hex0x(b []byte) string {
+func Hex0x(b []byte) string {
 	return "0x" + hex.EncodeToString(b[:])
+}
+
+func HexStr(b []byte) string {
+	return hex.EncodeToString(b[:])
 }
 
 func TestAA(t *testing.T) {
@@ -89,4 +94,39 @@ func Test_FinalityHeaderBranch(t *testing.T) {
 
 	tmplog.Println("leaf                ", leaf)
 	tmplog.Println("finalized checkpoint", hex0x(state.State.FinalizedCheckpoint().Root))
+}
+
+func Test_FinalityHeaderBranch2(t *testing.T) {
+	// State
+	_filename := "08eb3e781e76cf041406c71c5c48567874b8f1068c31f5f8324701e5278a128d.ssz"
+	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/beacon-state/" + _filename
+	sszbytes, err := file.ReadFileAsBytes(filename)
+	require.NoError(t, err)
+	state := ztype.FromSszBytes(sszbytes)
+	//stateRoot := state.HashTreeRoot()
+
+	// Finality Block
+	_filename = "147e2adcac6cf5424d6d36251b247b2633483b8d51e917742a88e527c9d83778.ssz"
+	filename = "/Users/jin/code/repos/prysm/tmp/ssz/keep/block/" + _filename
+	sszbytes, err = file.ReadFileAsBytes(filename)
+	require.NoError(t, err)
+	//block := wrapper.altairBeaconBlock{}
+	finalityBlock := eth.BeaconBlockAltair{}
+	err = finalityBlock.UnmarshalSSZ(sszbytes)
+	require.NoError(t, err)
+	finalityBlockRoot, err := finalityBlock.HashTreeRoot()
+	require.NoError(t, err)
+
+	// Check
+	require.Equal(t, HexStr(state.State.FinalizedCheckpoint().Root), HexStr(finalityBlockRoot[:]))
+
+	// Branch verification
+	_root := state.HashTreeRoot()
+	_gIndex := state.GetGIndex(20, 1) // finalized_checkpoint (20), root (1)
+	_leaf := state.GetLeaf(_gIndex)
+	_branch := state.GetBranch(_gIndex)
+	tmplog.Println("verification        ", ztype.Verify(_root, _gIndex, _leaf, _branch))
+	tmplog.Println("leaf                ", _leaf)
+	tmplog.Println("finalized checkpoint", hex0x(state.State.FinalizedCheckpoint().Root))
+	tmplog.Println("finalityBlock root  ", hex0x(finalityBlockRoot[:]))
 }

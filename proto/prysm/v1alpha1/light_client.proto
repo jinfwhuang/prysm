@@ -107,47 +107,62 @@ message LightClientUpdate {
   bytes fork_version = 8 [(ethereum.eth.ext.ssz_size) = "4"];
 }
 
+message SkipSyncUpdate {
+  ethereum.eth.v1alpha1.BeaconBlockHeader header = 1;
+
+  // Current sync committee corresponding to the header
+  ethereum.eth.v1alpha1.SyncCommittee current_sync_committee = 2;
+  repeated bytes current_sync_committee_branch = 3 [(ethereum.eth.ext.ssz_size) = "5,32"];
+
+  // Next sync committee corresponding to the header
+  ethereum.eth.v1alpha1.SyncCommittee next_sync_committee = 4;
+  repeated bytes next_sync_committee_branch = 5 [(ethereum.eth.ext.ssz_size) = "5,32"];
+
+  // The block header corresponding to finality checkpoint root
+  ethereum.eth.v1alpha1.BeaconBlockHeader finality_header = 6;
+  repeated bytes finality_branch = 7 [(ethereum.eth.ext.ssz_size) = "6,32"];
+
+  // Sync committee aggregate signature
+  bytes sync_committee_bits = 8 [(ethereum.eth.ext.ssz_size) = "sync_committee_bytes.size", (ethereum.eth.ext.cast_type) = "sync_committee_bits.type"];
+  bytes sync_committee_signature = 9 [(ethereum.eth.ext.ssz_size) = "96"];
+
+  // Fork version for the aggregate signature
+  bytes fork_version = 10 [(ethereum.eth.ext.ssz_size) = "4"];
+}
+
 // Services
 service LightClient {
-  rpc Updates(google.protobuf.Empty) returns (UpdatesResponse) {
+  rpc Updates(google.protobuf.Empty) returns (UpdateResponse) {
     option (google.api.http) = {
       get: "/eth/v1alpha1/light-client/updates",
     };
   }
-  rpc SkipSyncUpdate(SkipsyncRequest) returns (LightClientUpdate) {
+  rpc SkipSyncUpdate(SkipSyncRequest) returns (SkipSyncRequest) {
     option (google.api.http) = {
       get: "/eth/v1alpha1/light-client/skip-sync",
     };
   }
 }
 
-message UpdatesResponse {
+message UpdateResponse {
   repeated LightClientUpdate updates = 1;
 }
 
 // Modify this to use byte ssz_serialize(SkipSyncUpdateKey)
-message SkipsyncRequest {
-  uint64 epoch = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/eth2-types.Epoch"];
-  ethereum.eth.v1alpha1.SyncCommittee next_sync_committee = 2;
+message SkipSyncRequest {
+  // Merkle root of a SyncCommittee, the current sync committee
+  bytes key = 1 [(ethereum.eth.ext.ssz_size) = "32"];
+}
+
+message UpdatesResponse {
+  repeated LightClientUpdate updates = 1;
 }
 
 message SkipSyncResponse {
-  LightClientUpdate updates = 1;
+  SkipSyncUpdate update = 1;
 }
 
-
-
-//        epoch: Epoch
-//        sync_committee: SyncCommittee
-
-/*
-class SkipSyncUpdateKey(Container):
-    epoch: Epoch
-    sync_committee: SyncCommittee
- */
-
-//
-message SkipSyncRequestKey {
-  uint64 epoch = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/eth2-types.Epoch"];
-  ethereum.eth.v1alpha1.SyncCommittee next_sync_committee = 2;
-}
+//message SkipSyncRequestKey {
+//  uint64 epoch = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/eth2-types.Epoch"];
+//  ethereum.eth.v1alpha1.SyncCommittee next_sync_committee = 2;
+//}

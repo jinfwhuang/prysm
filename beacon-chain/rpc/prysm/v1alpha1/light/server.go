@@ -2,43 +2,37 @@ package light
 
 import (
 	"context"
-	"github.com/prysmaticlabs/prysm/beacon-chain/light"
-	tmplog "log"
-	"math/rand"
-
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/prysmaticlabs/prysm/beacon-chain/light"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
+	tmplog "log"
 )
 
 type Server struct {
 	LightClientService *light.Service
 }
 
-//type LightClientServer interface {
-//	Updates(context.Context, *empty.Empty) (*UpdatesResponse, error)
-//	SkipSyncUpdate(context.Context, *SkipsyncRequest) (*LightClientUpdate, error)
-//}
 func init() {
 	tmplog.SetFlags(tmplog.Llongfile)
-
 }
+
+const (
+	updatesResponseSize = 1
+)
 
 func (s *Server) Updates(ctx context.Context, _ *empty.Empty) (*ethpb.UpdatesResponse, error) {
 	q := s.LightClientService.Queue
-	size := rand.Intn(q.Len())
-	if size == 0 && q.Len() > 0 {
-		size = 1
+	size := updatesResponseSize
+	if size > q.Len() {
+		size = q.Len()
 	}
-	tmplog.Println("requesting size", size, "q size", q.Len(), "q cap", q.Cap())
-
 	updates := make([]*ethpb.LightClientUpdate, size)
 	_updates := q.Peek(size)
 	for i := 0; i < size; i++ {
 		updates[i] = _updates[i].(*ethpb.LightClientUpdate)
-		root, _ := updates[i].HashTreeRoot()
-		tmplog.Println(root)
+		//root, _ := updates[i].HashTreeRoot()
+		//tmplog.Println(root)
 	}
-	tmplog.Println("responding with updates", len(updates))
 	return &ethpb.UpdatesResponse{Updates: updates}, nil
 }
 

@@ -102,6 +102,7 @@ ssz_gen_marshal(
         "SyncCommittee",
         "SyncAggregatorSelectionData",
         "LightClientUpdate",
+        "SkipSyncUpdate",
     ],
 )
 

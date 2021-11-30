@@ -112,17 +112,22 @@ func (s *Service) run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancelFunc = cancel
 	s.waitForChainInitialization(ctx)
+	tmplog.Println("chain initialized")
+
 	s.waitForSync(ctx)
+	tmplog.Println("sync completed")
+
 	// Initialize the service from finalized (state, block) data.
 	log.Info("Initializing from finalized data")
 	if err := s.initializeFromFinalizedData(ctx); err != nil {
 		log.Fatal(err)
 	}
-	log.Info("Beginning subscriptions")
+
+	log.Info("Start listening for events that will update light client related queue and db")
 
 	// Begin listening for new chain head and finalized checkpoint events.
 	go s.subscribeHeadEvent(ctx)
-	go s.subscribeFinalizedEvent(ctx)
+	//go s.subscribeFinalizedEvent(ctx)
 }
 
 func (s *Service) waitForChainInitialization(ctx context.Context) {
@@ -168,8 +173,10 @@ func (s *Service) waitForSync(ctx context.Context) {
 		select {
 		case <-slotTicker.C():
 			if slots.ToEpoch(slots.SinceGenesis(s.genesisTime)) < 6 {
+				tmplog.Println("still waiting for sync...", slots.ToEpoch(slots.SinceGenesis(s.genesisTime)))
 				continue
 			}
+			tmplog.Println("finished waiting sync...", slots.ToEpoch(slots.SinceGenesis(s.genesisTime)))
 			return
 		case <-ctx.Done():
 			return
@@ -222,8 +229,8 @@ func (s *Service) initializeFromFinalizedData(ctx context.Context) error {
 	tmplog.Println("state root", stateRoot)
 	tmplog.Println(s.Queue)
 
-	s.onFinalizedCheckpoint(ctx, finalizedBlock, finalizedState)
-	s.buildLightClientUpdates(ctx, finalizedBlock, finalizedState)
+	//s.onFinalizedCheckpoint(ctx, finalizedBlock, finalizedState)
+	s.maintainQueueLightClientUpdates(ctx, finalizedBlock, finalizedState)
 
 	return nil
 }
