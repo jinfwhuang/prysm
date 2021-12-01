@@ -40,6 +40,18 @@ var (
 		Usage: "RPC port exposed by a beacon node",
 		Value: 4000,
 	}
+	// RPCHost defines the host on which the RPC server should listen.
+	RPCHostLight = &cli.StringFlag{
+		Name:  "rpc-host-light",
+		Usage: "Host on which the RPC server should listen",
+		Value: "127.0.0.1",
+	}
+	// RPCPort defines a beacon node RPC port to open.
+	RPCPortLight = &cli.IntFlag{
+		Name:  "rpc-port-light",
+		Usage: "RPC port exposed by a beacon node",
+		Value: 4001,
+	}
 	// MonitoringPortFlag defines the http port used to serve prometheus metrics.
 	MonitoringPortFlag = &cli.IntFlag{
 		Name:  "monitoring-port",

@@ -167,3 +167,29 @@ message SkipSyncRequest {
 //  uint64 epoch = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/eth2-types.Epoch"];
 //  ethereum.eth.v1alpha1.SyncCommittee next_sync_committee = 2;
 //}
+
+
+
+// Light Client Node
+service LightNode {
+  // Beacon state API related endpoints.
+
+//  // GetGenesis retrieves details of the chain's genesis which can be used to identify chain.
+//  rpc GetGenesis(google.protobuf.Empty) returns (v1.GenesisResponse) {
+//    option (google.api.http) = { get: "/internal/eth/v1/beacon/genesis" };
+//  }
+
+  // ListBlockHeaders retrieves block headers matching given query. By default it will fetch current head slot blocks.
+  rpc Head(google.protobuf.Empty) returns (BeaconBlockHeader) {
+    option (google.api.http) = {
+      get: "/internal/eth/v1/beacon/head"
+    };
+  }
+
+  rpc FinalizedHead(google.protobuf.Empty) returns (BeaconBlockHeader) {
+    option (google.api.http) = {
+      get: "/internal/eth/v1/beacon/finalized-head"
+    };
+  }
+
+}

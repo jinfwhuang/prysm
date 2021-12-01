@@ -2,25 +2,19 @@ package light
 
 import (
 	"context"
-	//"github.com/enriquebris/goconcurrentqueue"
-	"github.com/prysmaticlabs/prysm/cache/fifo"
-	log "github.com/sirupsen/logrus"
-	tmplog "log"
-	"sync"
-	"time"
-
 	"github.com/prysmaticlabs/prysm/beacon-chain/blockchain"
-	"github.com/prysmaticlabs/prysm/beacon-chain/core/feed"
 	statefeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/db/iface"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state/stategen"
 	syncSrv "github.com/prysmaticlabs/prysm/beacon-chain/sync"
-	"github.com/prysmaticlabs/prysm/config/params"
+	"github.com/prysmaticlabs/prysm/cache/fifo"
 	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	block2 "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1/block"
-	"github.com/prysmaticlabs/prysm/time/slots"
+	log "github.com/sirupsen/logrus"
+	tmplog "log"
+	"sync"
 )
 
 func init() {
@@ -47,30 +41,15 @@ type Config struct {
 type Service struct {
 	cfg        *Config
 	cancelFunc context.CancelFunc
-	//prevHeadData             map[[32]byte]*ethpb.SyncAttestedData
-	lock        sync.RWMutex
-	genesisTime time.Time
-	//finalizedByEpoch         map[types.Epoch]*ethpb.LightClientFinalizedCheckpoint
-	//bestUpdateByPeriod       map[uint64]*ethpb.LightClientUpdate
-	//latestFinalizedUpdate    *ethpb.LightClientUpdate
-	//latestNonFinalizedUpdate *ethpb.LightClientUpdate
-
-	Queue fifo.Queue
+	lock       sync.RWMutex
+	Queue      fifo.Queue
 }
 
-// New --
 func New(ctx context.Context, cfg *Config) *Service {
-	// Create a Queue for light client updates
-
 	queue := fifo.NewFixedFifo(cfg.LightClientUpdatesQueueSize) // Light client update Queue
-	//queue.
 
 	return &Service{
-		cfg: cfg,
-		//prevHeadData:       make(map[[32]byte]*ethpb.SyncAttestedData),
-		//finalizedByEpoch:   make(map[types.Epoch]*ethpb.LightClientFinalizedCheckpoint),
-		//bestUpdateByPeriod: make(map[uint64]*ethpb.LightClientUpdate),
-
+		cfg:   cfg,
 		Queue: &queue,
 	}
 }
@@ -95,11 +74,6 @@ func (s *Service) GetSkipSyncUpdate(ctx context.Context, key [32]byte) (*ethpb.S
 func (s *Service) run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancelFunc = cancel
-	s.waitForChainInitialization(ctx)
-	tmplog.Println("chain initialized")
-
-	s.waitForSync(ctx)
-	tmplog.Println("sync completed")
 
 	// Initialize the service from finalized (state, block) data.
 	log.Info("Initializing from finalized data")
@@ -108,64 +82,7 @@ func (s *Service) run() {
 	}
 
 	log.Info("Start listening for events that will update light client related queue and db")
-
-	// Begin listening for new chain head and finalized checkpoint events.
 	go s.subscribeHeadEvent(ctx)
-	//go s.subscribeFinalizedEvent(ctx)
-}
-
-func (s *Service) waitForChainInitialization(ctx context.Context) {
-	stateChannel := make(chan *feed.Event, 1)
-	stateSub := s.cfg.StateNotifier.StateFeed().Subscribe(stateChannel)
-	defer stateSub.Unsubscribe()
-	defer close(stateChannel)
-	for {
-		select {
-		case stateEvent := <-stateChannel:
-			// Wait for us to receive the genesis time via a chain started notification.
-			if stateEvent.Type == statefeed.Initialized {
-				// Alternatively, if the chain has already started, we then read the genesis
-				// time value from this data.
-				data, ok := stateEvent.Data.(*statefeed.InitializedData)
-				if !ok {
-					log.Error(
-						"Could not receive chain start notification, want *statefeed.ChainStartedData",
-					)
-					return
-				}
-				s.genesisTime = data.StartTime
-				log.WithField("genesisTime", s.genesisTime).Info(
-					"Received chain initialization event",
-				)
-				return
-			}
-		case err := <-stateSub.Err():
-			log.WithError(err).Error(
-				"Could not subscribe to state events",
-			)
-			return
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (s *Service) waitForSync(ctx context.Context) {
-	slotTicker := slots.NewSlotTicker(s.genesisTime, params.BeaconConfig().SecondsPerSlot)
-	defer slotTicker.Done()
-	for {
-		select {
-		case <-slotTicker.C():
-			if slots.ToEpoch(slots.SinceGenesis(s.genesisTime)) < 6 {
-				tmplog.Println("still waiting for sync...", slots.ToEpoch(slots.SinceGenesis(s.genesisTime)))
-				continue
-			}
-			tmplog.Println("finished waiting sync...", slots.ToEpoch(slots.SinceGenesis(s.genesisTime)))
-			return
-		case <-ctx.Done():
-			return
-		}
-	}
 }
 
 func (s *Service) finalizedBlockOrGenesis(ctx context.Context, cpt *ethpb.Checkpoint) (block2.SignedBeaconBlock, error) {
@@ -205,13 +122,6 @@ func (s *Service) initializeFromFinalizedData(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	//return s.onFinalized(ctx, finalizedBlock, finalizedState)
-	blkRoot, err := finalizedBlock.Block().HashTreeRoot()
-	stateRoot, err := finalizedState.HashTreeRoot(ctx)
-
-	tmplog.Println("block root", blkRoot)
-	tmplog.Println("state root", stateRoot)
-	tmplog.Println(s.Queue)
 
 	//s.onFinalizedCheckpoint(ctx, finalizedBlock, finalizedState)
 	s.maintainQueueLightClientUpdates(ctx, finalizedBlock, finalizedState)

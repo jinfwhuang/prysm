@@ -117,7 +117,6 @@ func (s *Service) maintainQueueLightClientUpdates(ctx context.Context, block blo
 	}
 
 	s.Queue.Enqueue(update)
-	tmplog.Println("light-client-update queue", s.Queue.Len(), s.Queue.Cap())
 
 	// Skip Sync
 	currentCom, err := state.CurrentSyncCommittee()
