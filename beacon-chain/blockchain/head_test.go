@@ -1,13 +1,13 @@
 package blockchain
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
 
 	types "github.com/prysmaticlabs/eth2-types"
 	mock "github.com/prysmaticlabs/prysm/beacon-chain/blockchain/testing"
+	"github.com/prysmaticlabs/prysm/beacon-chain/db"
 	testDB "github.com/prysmaticlabs/prysm/beacon-chain/db/testing"
 	"github.com/prysmaticlabs/prysm/config/features"
 	"github.com/prysmaticlabs/prysm/config/params"
@@ -38,39 +38,53 @@ func TestSaveHead_Different(t *testing.T) {
 	beaconDB := testDB.SetupDB(t)
 	service := setupBeaconChain(t, beaconDB)
 
-	util.NewBeaconBlock()
-	oldBlock := wrapper.WrappedPhase0SignedBeaconBlock(
-		util.NewBeaconBlock(),
-	)
-	require.NoError(t, service.cfg.BeaconDB.SaveBlock(context.Background(), oldBlock))
-	oldRoot, err := oldBlock.Block().HashTreeRoot()
+	// Chain setup
+	// Old: 0 <-- 1
+	// New: 0 <-- 1 <-- 2
+	baseBlk := util.NewBeaconBlock()
+	baseBlk.Block.Slot = 0
+	require.NoError(t, service.cfg.BeaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(baseBlk)))
+	baseBlkRoot, err := baseBlk.Block.HashTreeRoot()
 	require.NoError(t, err)
+
+	blk1 := util.NewBeaconBlock()
+	blk1.Block.Slot = 1
+	blk1.Block.ParentRoot = baseBlkRoot[:]
+	require.NoError(t, service.cfg.BeaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(blk1)))
+	blk1Root, err := blk1.Block.HashTreeRoot()
+	require.NoError(t, err)
+
+	blk2 := util.NewBeaconBlock()
+	blk2.Block.Slot = 2
+	blk2.Block.ParentRoot = blk1Root[:]
+	require.NoError(t, service.cfg.BeaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(blk2)))
+	blk2Root, err := blk2.Block.HashTreeRoot()
+	require.NoError(t, err)
+
+	// Old head is "1"
 	service.head = &head{
-		slot:  0,
-		root:  oldRoot,
-		block: oldBlock,
+		slot:  1,
+		root:  blk1Root,
+		block: wrapper.WrappedPhase0SignedBeaconBlock(blk1),
 	}
 
-	newHeadSignedBlock := util.NewBeaconBlock()
-	newHeadSignedBlock.Block.Slot = 1
-	newHeadBlock := newHeadSignedBlock.Block
-
-	require.NoError(t, service.cfg.BeaconDB.SaveBlock(context.Background(), wrapper.WrappedPhase0SignedBeaconBlock(newHeadSignedBlock)))
-	newRoot, err := newHeadBlock.HashTreeRoot()
-	require.NoError(t, err)
+	// Update beacon-chain state to use "2"
 	headState, err := util.NewBeaconState()
 	require.NoError(t, err)
-	require.NoError(t, headState.SetSlot(1))
-	require.NoError(t, service.cfg.BeaconDB.SaveStateSummary(context.Background(), &ethpb.StateSummary{Slot: 1, Root: newRoot[:]}))
-	require.NoError(t, service.cfg.BeaconDB.SaveState(context.Background(), headState, newRoot))
-	require.NoError(t, service.saveHead(context.Background(), newRoot))
+	require.NoError(t, headState.SetSlot(2))
+	require.NoError(t, service.cfg.BeaconDB.SaveStateSummary(ctx, &ethpb.StateSummary{
+		Slot: 2,
+		Root: blk2Root[:],
+	}))
+	require.NoError(t, service.cfg.BeaconDB.SaveState(ctx, headState, blk2Root))
+	require.NoError(t, service.saveHead(ctx, blk2Root))
 
-	assert.Equal(t, types.Slot(1), service.HeadSlot(), "Head did not change")
-
-	cachedRoot, err := service.HeadRoot(context.Background())
+	// Validations
+	assert.Equal(t, types.Slot(2), service.HeadSlot(), "Head did not change")
+	cachedRoot, err := service.HeadRoot(ctx)
 	require.NoError(t, err)
-	assert.DeepEqual(t, cachedRoot, newRoot[:], "Head did not change")
-	assert.DeepEqual(t, newHeadSignedBlock, service.headBlock().Proto(), "Head did not change")
+	assert.DeepEqual(t, cachedRoot, blk2Root[:], "Head did not change")
+	assert.DeepEqual(t, blk2, service.headBlock().Proto(), "Head did not change")
 	assert.DeepSSZEqual(t, headState.CloneInnerState(), service.headState(ctx).CloneInnerState(), "Head did not change")
 }
 
@@ -80,42 +94,53 @@ func TestSaveHead_Different_Reorg(t *testing.T) {
 	beaconDB := testDB.SetupDB(t)
 	service := setupBeaconChain(t, beaconDB)
 
-	oldBlock := wrapper.WrappedPhase0SignedBeaconBlock(
-		util.NewBeaconBlock(),
-	)
-	require.NoError(t, service.cfg.BeaconDB.SaveBlock(context.Background(), oldBlock))
-	oldRoot, err := oldBlock.Block().HashTreeRoot()
+	// Chain setup
+	// Old: 0 <-- 1
+	// New: 0 <-- 2
+	baseBlk := util.NewBeaconBlock()
+	baseBlk.Block.Slot = 0
+	require.NoError(t, service.cfg.BeaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(baseBlk)))
+	baseBlkRoot, err := baseBlk.Block.HashTreeRoot()
 	require.NoError(t, err)
+
+	blk1 := util.NewBeaconBlock()
+	blk1.Block.Slot = 1
+	blk1.Block.ParentRoot = baseBlkRoot[:]
+	require.NoError(t, service.cfg.BeaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(blk1)))
+	blk1Root, err := blk1.Block.HashTreeRoot()
+	require.NoError(t, err)
+
+	blk2 := util.NewBeaconBlock()
+	blk2.Block.Slot = 2
+	blk2.Block.ParentRoot = baseBlkRoot[:]
+	require.NoError(t, service.cfg.BeaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(blk2)))
+	blk2Root, err := blk2.Block.HashTreeRoot()
+	require.NoError(t, err)
+
+	// Old head is "1"
 	service.head = &head{
-		slot:  0,
-		root:  oldRoot,
-		block: oldBlock,
+		slot:  1,
+		root:  blk1Root,
+		block: wrapper.WrappedPhase0SignedBeaconBlock(blk1),
 	}
 
-	reorgChainParent := [32]byte{'B'}
-	newHeadSignedBlock := util.NewBeaconBlock()
-	newHeadSignedBlock.Block.Slot = 1
-	newHeadSignedBlock.Block.ParentRoot = reorgChainParent[:]
-	newHeadBlock := newHeadSignedBlock.Block
-
-	require.NoError(t, service.cfg.BeaconDB.SaveBlock(context.Background(), wrapper.WrappedPhase0SignedBeaconBlock(newHeadSignedBlock)))
-	newRoot, err := newHeadBlock.HashTreeRoot()
-	require.NoError(t, err)
+	// Update beacon-chain state to use "2"
 	headState, err := util.NewBeaconState()
 	require.NoError(t, err)
-	require.NoError(t, headState.SetSlot(1))
-	require.NoError(t, service.cfg.BeaconDB.SaveStateSummary(context.Background(), &ethpb.StateSummary{Slot: 1, Root: newRoot[:]}))
-	require.NoError(t, service.cfg.BeaconDB.SaveState(context.Background(), headState, newRoot))
-	require.NoError(t, service.saveHead(context.Background(), newRoot))
+	require.NoError(t, headState.SetSlot(2))
+	require.NoError(t, service.cfg.BeaconDB.SaveStateSummary(ctx, &ethpb.StateSummary{
+		Slot: 2,
+		Root: blk2Root[:],
+	}))
+	require.NoError(t, service.cfg.BeaconDB.SaveState(ctx, headState, blk2Root))
+	require.NoError(t, service.saveHead(ctx, blk2Root))
 
-	assert.Equal(t, types.Slot(1), service.HeadSlot(), "Head did not change")
-
-	cachedRoot, err := service.HeadRoot(context.Background())
+	// Validations
+	assert.Equal(t, types.Slot(2), service.HeadSlot(), "Head did not change")
+	cachedRoot, err := service.HeadRoot(ctx)
 	require.NoError(t, err)
-	if !bytes.Equal(cachedRoot, newRoot[:]) {
-		t.Error("Head did not change")
-	}
-	assert.DeepEqual(t, newHeadSignedBlock, service.headBlock().Proto(), "Head did not change")
+	assert.DeepEqual(t, cachedRoot, blk2Root[:], "Head did not change")
+	assert.DeepEqual(t, blk2, service.headBlock().Proto(), "Head did not change")
 	assert.DeepSSZEqual(t, headState.CloneInnerState(), service.headState(ctx).CloneInnerState(), "Head did not change")
 	require.LogsContain(t, hook, "Chain reorg occurred")
 }
@@ -221,25 +246,49 @@ func TestSaveOrphanedAtts(t *testing.T) {
 		CorrectlyInsertOrphanedAtts: true,
 	})
 	defer resetCfg()
-
-	genesis, keys := util.DeterministicGenesisState(t, 64)
-	b, err := util.GenerateFullBlock(genesis, keys, util.DefaultBlockGenConfig(), 1)
-	assert.NoError(t, err)
-	r, err := b.Block.HashTreeRoot()
-	require.NoError(t, err)
-
 	ctx := context.Background()
 	beaconDB := testDB.SetupDB(t)
 	service := setupBeaconChain(t, beaconDB)
 	service.genesisTime = time.Now()
 
-	require.NoError(t, service.cfg.BeaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(b)))
-	require.NoError(t, service.saveOrphanedAtts(ctx, r))
+	// Chain setup
+	// Old: 0 <-- 1
+	// New: 0 <-- 2
+	beaconState, keys := util.DeterministicGenesisState(t, 64)
+	blkGenesis, err := util.GenerateFullBlock(beaconState, keys, util.DefaultBlockGenConfig(), 1)
+	assert.NoError(t, err)
+	blkGenesis.Block.Slot = 0
+	require.NoError(t, service.cfg.BeaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(blkGenesis)))
+	blkGensisRoot, err := blkGenesis.Block.HashTreeRoot()
+	require.NoError(t, err)
 
-	require.Equal(t, len(b.Block.Body.Attestations), service.cfg.AttPool.AggregatedAttestationCount())
-	savedAtts := service.cfg.AttPool.AggregatedAttestations()
-	atts := b.Block.Body.Attestations
-	require.DeepSSZEqual(t, atts, savedAtts)
+	// We just need some valid attestation BeaconDB.SaveBlock succeed for blk1
+	atts := blkGenesis.Block.Body.Attestations
+
+	blk1 := util.NewBeaconBlock()
+	blk1.Block.Slot = 1
+	blk1.Block.Body.Attestations = atts
+	blk1.Block.ParentRoot = blkGensisRoot[:]
+	blk1Root, err := blk1.Block.HashTreeRoot()
+	require.NoError(t, err)
+
+	blk2 := util.NewBeaconBlock()
+	blk2.Block.Slot = 2
+	blk2.Block.ParentRoot = blkGensisRoot[:]
+	blk2Root, err := blk2.Block.HashTreeRoot()
+	require.NoError(t, err)
+
+	// Save blks to DB
+	for _, blk := range []*ethpb.SignedBeaconBlock{blkGenesis, blk1, blk2} {
+		saveBlk(ctx, t, beaconDB, blk)
+	}
+
+	require.NoError(t, service.saveOrphanedAtts(ctx, blk1Root, blk2Root))
+
+	// Validations
+	require.NotEqual(t, 0, len(blk1.Block.Body.Attestations))
+	require.Equal(t, len(blk1.Block.Body.Attestations), service.cfg.AttPool.AggregatedAttestationCount())
+	require.DeepSSZEqual(t, blk1.Block.Body.Attestations, service.cfg.AttPool.AggregatedAttestations())
 }
 
 func TestSaveOrphanedAtts_CanFilter(t *testing.T) {
@@ -248,22 +297,232 @@ func TestSaveOrphanedAtts_CanFilter(t *testing.T) {
 	})
 	defer resetCfg()
 
-	genesis, keys := util.DeterministicGenesisState(t, 64)
-	b, err := util.GenerateFullBlock(genesis, keys, util.DefaultBlockGenConfig(), 1)
-	assert.NoError(t, err)
-	r, err := b.Block.HashTreeRoot()
-	require.NoError(t, err)
-
 	ctx := context.Background()
 	beaconDB := testDB.SetupDB(t)
 	service := setupBeaconChain(t, beaconDB)
 	service.genesisTime = time.Now().Add(time.Duration(-1*int64(params.BeaconConfig().SlotsPerEpoch+1)*int64(params.BeaconConfig().SecondsPerSlot)) * time.Second)
 
-	require.NoError(t, service.cfg.BeaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(b)))
-	require.NoError(t, service.saveOrphanedAtts(ctx, r))
+	// Chain setup
+	// Old: 0 <-- 1
+	// New: 0 <-- 2
+	beaconState, keys := util.DeterministicGenesisState(t, 64)
+	blkGenesis, err := util.GenerateFullBlock(beaconState, keys, util.DefaultBlockGenConfig(), 1)
+	assert.NoError(t, err)
+	blkGenesis.Block.Slot = 0
+	blkGensisRoot, err := blkGenesis.Block.HashTreeRoot()
+	require.NoError(t, err)
 
+	// We just need some valid attestation BeaconDB.SaveBlock succeed for blk1
+	atts := blkGenesis.Block.Body.Attestations
+
+	blk1 := util.NewBeaconBlock()
+	blk1.Block.Slot = 1
+	blk1.Block.Body.Attestations = atts
+	blk1.Block.ParentRoot = blkGensisRoot[:]
+	blk1Root, err := blk1.Block.HashTreeRoot()
+	require.NoError(t, err)
+
+	blk2 := util.NewBeaconBlock()
+	blk2.Block.Slot = 2
+	blk2.Block.ParentRoot = blkGensisRoot[:]
+	blk2Root, err := blk2.Block.HashTreeRoot()
+	require.NoError(t, err)
+
+	// Save blks to DB
+	for _, blk := range []*ethpb.SignedBeaconBlock{blkGenesis, blk1, blk2} {
+		saveBlk(ctx, t, beaconDB, blk)
+	}
+
+	require.NoError(t, service.saveOrphanedAtts(ctx, blk1Root, blk2Root))
+	require.NotEqual(t, 0, blk1.Block.Body.Attestations)
 	require.Equal(t, 0, service.cfg.AttPool.AggregatedAttestationCount())
-	savedAtts := service.cfg.AttPool.AggregatedAttestations()
-	atts := b.Block.Body.Attestations
-	require.DeepNotSSZEqual(t, atts, savedAtts)
+}
+
+func TestGetOrphanedBlocks(t *testing.T) {
+	resetCfg := features.InitWithReset(&features.Flags{
+		CorrectlyInsertOrphanedAtts: true,
+	})
+	defer resetCfg()
+
+	ctx := context.Background()
+	beaconDB := testDB.SetupDB(t)
+	service := setupBeaconChain(t, beaconDB)
+	service.genesisTime = time.Now()
+
+	genesis, keys := util.DeterministicGenesisState(t, 64)
+	blkG, err := util.GenerateFullBlock(genesis, keys, util.DefaultBlockGenConfig(), 1)
+	require.NoError(t, beaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(blkG)))
+	blk100 := util.NewBeaconBlock()
+	blk100.Block.Slot = 100
+	assert.NoError(t, err)
+	blk101 := util.NewBeaconBlock()
+	blk101.Block.Slot = 101
+	blk102 := util.NewBeaconBlock()
+	blk102.Block.Slot = 102
+
+	// Setup simple chain: 1 <-- 100 <-- 101 <-- 102
+	headBlk := blkG
+	for _, nextBlk := range []*ethpb.SignedBeaconBlock{blk100, blk101, blk102} {
+		headBlkRoot, err := headBlk.Block.HashTreeRoot()
+		nextBlk.Block.ParentRoot = headBlkRoot[:]
+		assert.NoError(t, err)
+		headBlk = nextBlk
+		require.NoError(t, beaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(headBlk)))
+	}
+
+	blk100Root, err := blk100.Block.HashTreeRoot()
+	assert.NoError(t, err)
+	blk102Root, err := blk102.Block.HashTreeRoot()
+	assert.NoError(t, err)
+
+	orphanedBlks, err := service.getOrphanedBlocks(ctx, blk102Root, blk100Root)
+	assert.NoError(t, err)
+	require.Equal(t, 2, len(orphanedBlks))
+}
+
+func TestGetOrphanedBlocks_Empty(t *testing.T) {
+	resetCfg := features.InitWithReset(&features.Flags{
+		CorrectlyInsertOrphanedAtts: true,
+	})
+	defer resetCfg()
+
+	ctx := context.Background()
+	beaconDB := testDB.SetupDB(t)
+	service := setupBeaconChain(t, beaconDB)
+	service.genesisTime = time.Now()
+
+	genesis, keys := util.DeterministicGenesisState(t, 64)
+	blkGenesis, err := util.GenerateFullBlock(genesis, keys, util.DefaultBlockGenConfig(), 1)
+	assert.NoError(t, err)
+	blkGRoot, err := blkGenesis.Block.HashTreeRoot()
+	assert.NoError(t, err)
+	require.NoError(t, beaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(blkGenesis)))
+
+	// Get orphaned blocks from head to head
+	orphanedBlks, err := service.getOrphanedBlocks(ctx, blkGRoot, blkGRoot)
+	assert.NoError(t, err)
+	require.Equal(t, 0, len(orphanedBlks))
+}
+
+func TestCommonAncestorRoot(t *testing.T) {
+	resetCfg := features.InitWithReset(&features.Flags{
+		CorrectlyInsertOrphanedAtts: true,
+	})
+	defer resetCfg()
+
+	ctx := context.Background()
+	beaconDB := testDB.SetupDB(t)
+	service := setupBeaconChain(t, beaconDB)
+	service.genesisTime = time.Now()
+
+	genesis, keys := util.DeterministicGenesisState(t, 64)
+	blkG, err := util.GenerateFullBlock(genesis, keys, util.DefaultBlockGenConfig(), 1)
+	assert.NoError(t, err)
+	blkGRoot, err := blkG.Block.HashTreeRoot()
+	assert.NoError(t, err)
+	require.NoError(t, beaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(blkG)))
+
+	blk10 := util.NewBeaconBlock()
+	blk10.Block.Slot = 10
+	blk11 := util.NewBeaconBlock()
+	blk11.Block.Slot = 11
+	blk12 := util.NewBeaconBlock()
+	blk12.Block.Slot = 12
+	blk13 := util.NewBeaconBlock()
+	blk13.Block.Slot = 13
+	blk14 := util.NewBeaconBlock()
+	blk14.Block.Slot = 14
+	blk15 := util.NewBeaconBlock()
+	blk15.Block.Slot = 15
+
+	// Setup simple chain: 1 <-- 10 <-- 11 <-- 13
+	headBlk := blkG
+	for _, nextBlk := range []*ethpb.SignedBeaconBlock{blk10, blk11, blk13} {
+		headBlkRoot, err := headBlk.Block.HashTreeRoot()
+		nextBlk.Block.ParentRoot = headBlkRoot[:]
+		assert.NoError(t, err)
+		headBlk = nextBlk
+		saveBlk(ctx, t, beaconDB, headBlk)
+	}
+
+	// Setup simple chain: 1 <-- 12 <-- 14 <-- 15
+	headBlk = blkG
+	for _, nextBlk := range []*ethpb.SignedBeaconBlock{blk12, blk14, blk15} {
+		headBlkRoot, err := headBlk.Block.HashTreeRoot()
+		nextBlk.Block.ParentRoot = headBlkRoot[:]
+		assert.NoError(t, err)
+		headBlk = nextBlk
+		saveBlk(ctx, t, beaconDB, headBlk)
+	}
+
+	blk13Root, err := blk13.Block.HashTreeRoot()
+	assert.NoError(t, err)
+	blk15Root, err := blk15.Block.HashTreeRoot()
+	assert.NoError(t, err)
+
+	commonRoot, err := service.commonAncestorRoot(ctx, blk15Root, blk13Root)
+	assert.NoError(t, err)
+	require.Equal(t, commonRoot, blkGRoot)
+}
+
+func TestCommonAncestorRoot_OutOfBound(t *testing.T) {
+	resetCfg := features.InitWithReset(&features.Flags{
+		CorrectlyInsertOrphanedAtts: true,
+	})
+	defer resetCfg()
+
+	ctx := context.Background()
+	beaconDB := testDB.SetupDB(t)
+	service := setupBeaconChain(t, beaconDB)
+	service.genesisTime = time.Now()
+
+	genesis, keys := util.DeterministicGenesisState(t, 64)
+	blkG, err := util.GenerateFullBlock(genesis, keys, util.DefaultBlockGenConfig(), 1)
+	assert.NoError(t, err)
+	require.NoError(t, beaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(blkG)))
+
+	// Setup branch: 1 <-- 3 <-- 5 <-- ... < -- 63
+	headBlkBranch1 := blkG
+	for i := 3; i < int(params.BeaconConfig().SlotsPerEpoch)*2; i += 2 {
+		blk := util.NewBeaconBlock()
+		blk.Block.Slot = types.Slot(i)
+		headBlkRoot, err := headBlkBranch1.Block.HashTreeRoot()
+		blk.Block.ParentRoot = headBlkRoot[:]
+		assert.NoError(t, err)
+		headBlkBranch1 = blk
+		saveBlk(ctx, t, beaconDB, headBlkBranch1)
+	}
+
+	// Setup branch: 1 <-- 2 <-- 4 <-- ... < -- 62
+	headBlkBranch2 := blkG
+	for i := 2; i < int(params.BeaconConfig().SlotsPerEpoch)*2; i += 2 {
+		blk := util.NewBeaconBlock()
+		blk.Block.Slot = types.Slot(i)
+		headBlkRoot, err := headBlkBranch2.Block.HashTreeRoot()
+		blk.Block.ParentRoot = headBlkRoot[:]
+		assert.NoError(t, err)
+		headBlkBranch2 = blk
+		saveBlk(ctx, t, beaconDB, headBlkBranch2)
+	}
+
+	headBlkRootBranch1, err := headBlkBranch1.Block.HashTreeRoot()
+	assert.NoError(t, err)
+	headBlkRootBranch2, err := headBlkBranch2.Block.HashTreeRoot()
+	assert.NoError(t, err)
+	_, err = service.commonAncestorRoot(ctx, headBlkRootBranch1, headBlkRootBranch2)
+	assert.ErrorContains(t, "could not find common ancestor root", err)
+}
+
+// Helper function to save the block and its associated state
+func saveBlk(ctx context.Context, t *testing.T, beaconDB db.Database, blk *ethpb.SignedBeaconBlock) {
+	// Save block to DB
+	require.NoError(t, beaconDB.SaveBlock(ctx, wrapper.WrappedPhase0SignedBeaconBlock(blk)))
+
+	// Save state to DB
+	blkRoot, err := blk.Block.HashTreeRoot()
+	assert.NoError(t, err)
+	state, err := util.NewBeaconState()
+	assert.NoError(t, err)
+	require.NoError(t, state.SetSlot(blk.Block.Slot))
+	require.NoError(t, beaconDB.SaveState(ctx, state, blkRoot))
 }
