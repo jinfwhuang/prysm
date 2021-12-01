@@ -60,7 +60,7 @@ var (
 )
 
 func request_LightClient_SkipSyncUpdate_0(ctx context.Context, marshaler runtime.Marshaler, client LightClientClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq SkipsyncRequest
+	var protoReq SkipSyncRequest
 	var metadata runtime.ServerMetadata
 
 	if err := req.ParseForm(); err != nil {
@@ -76,7 +76,7 @@ func request_LightClient_SkipSyncUpdate_0(ctx context.Context, marshaler runtime
 }
 
 func local_request_LightClient_SkipSyncUpdate_0(ctx context.Context, marshaler runtime.Marshaler, server LightClientServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq SkipsyncRequest
+	var protoReq SkipSyncRequest
 	var metadata runtime.ServerMetadata
 
 	if err := req.ParseForm(); err != nil {

@@ -20,6 +20,10 @@ const (
 	updatesResponseSize = 1
 )
 
+Updates(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*UpdateResponse, error)
+SkipSyncUpdate(ctx context.Context, in *SkipSyncRequest, opts ...grpc.CallOption) (*SkipSyncRequest, error)
+
+
 func (s *Server) Updates(ctx context.Context, _ *empty.Empty) (*ethpb.UpdatesResponse, error) {
 	q := s.LightClientService.Queue
 	size := updatesResponseSize
@@ -36,7 +40,7 @@ func (s *Server) Updates(ctx context.Context, _ *empty.Empty) (*ethpb.UpdatesRes
 	return &ethpb.UpdatesResponse{Updates: updates}, nil
 }
 
-func (s *Server) SkipSyncUpdate(ctx context.Context, req *ethpb.SkipsyncRequest) (*ethpb.LightClientUpdate, error) {
+func (s *Server) SkipSyncUpdate(ctx context.Context, req *ethpb.SkipSyncRequest) (*ethpb.LightClientUpdate, error) {
 	tmplog.Println("requesting for skip-sync-udpate", req)
 
 	return &ethpb.LightClientUpdate{}, nil

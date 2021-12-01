@@ -137,7 +137,7 @@ service LightClient {
       get: "/eth/v1alpha1/light-client/updates",
     };
   }
-  rpc SkipSyncUpdate(SkipSyncRequest) returns (SkipSyncRequest) {
+  rpc SkipSyncUpdate(SkipSyncRequest) returns (SkipSyncUpdate) {
     option (google.api.http) = {
       get: "/eth/v1alpha1/light-client/skip-sync",
     };
