@@ -37,56 +37,56 @@ var _ = github_com_prysmaticlabs_eth2_types.Epoch(0)
 var _ = emptypb.Empty{}
 var _ = empty.Empty{}
 
-func request_LightClient_Updates_0(ctx context.Context, marshaler runtime.Marshaler, client LightClientClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_LightClient_GetUpdates_0(ctx context.Context, marshaler runtime.Marshaler, client LightClientClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var protoReq emptypb.Empty
 	var metadata runtime.ServerMetadata
 
-	msg, err := client.Updates(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.GetUpdates(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
 }
 
-func local_request_LightClient_Updates_0(ctx context.Context, marshaler runtime.Marshaler, server LightClientServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_LightClient_GetUpdates_0(ctx context.Context, marshaler runtime.Marshaler, server LightClientServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var protoReq emptypb.Empty
 	var metadata runtime.ServerMetadata
 
-	msg, err := server.Updates(ctx, &protoReq)
+	msg, err := server.GetUpdates(ctx, &protoReq)
 	return msg, metadata, err
 
 }
 
 var (
-	filter_LightClient_SkipSyncUpdate_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
+	filter_LightClient_GetSkipSyncUpdate_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
 )
 
-func request_LightClient_SkipSyncUpdate_0(ctx context.Context, marshaler runtime.Marshaler, client LightClientClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_LightClient_GetSkipSyncUpdate_0(ctx context.Context, marshaler runtime.Marshaler, client LightClientClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var protoReq SkipSyncRequest
 	var metadata runtime.ServerMetadata
 
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_LightClient_SkipSyncUpdate_0); err != nil {
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_LightClient_GetSkipSyncUpdate_0); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	msg, err := client.SkipSyncUpdate(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.GetSkipSyncUpdate(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
 }
 
-func local_request_LightClient_SkipSyncUpdate_0(ctx context.Context, marshaler runtime.Marshaler, server LightClientServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_LightClient_GetSkipSyncUpdate_0(ctx context.Context, marshaler runtime.Marshaler, server LightClientServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var protoReq SkipSyncRequest
 	var metadata runtime.ServerMetadata
 
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_LightClient_SkipSyncUpdate_0); err != nil {
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_LightClient_GetSkipSyncUpdate_0); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	msg, err := server.SkipSyncUpdate(ctx, &protoReq)
+	msg, err := server.GetSkipSyncUpdate(ctx, &protoReq)
 	return msg, metadata, err
 
 }
@@ -97,18 +97,18 @@ func local_request_LightClient_SkipSyncUpdate_0(ctx context.Context, marshaler r
 // Note that using this registration option will cause many gRPC library features to stop working. Consider using RegisterLightClientHandlerFromEndpoint instead.
 func RegisterLightClientHandlerServer(ctx context.Context, mux *runtime.ServeMux, server LightClientServer) error {
 
-	mux.Handle("GET", pattern_LightClient_Updates_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle("GET", pattern_LightClient_GetUpdates_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		rctx, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/ethereum.eth.v1alpha1.LightClient/Updates")
+		rctx, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/ethereum.eth.v1alpha1.LightClient/GetUpdates")
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_LightClient_Updates_0(rctx, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_LightClient_GetUpdates_0(rctx, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		ctx = runtime.NewServerMetadataContext(ctx, md)
 		if err != nil {
@@ -116,22 +116,22 @@ func RegisterLightClientHandlerServer(ctx context.Context, mux *runtime.ServeMux
 			return
 		}
 
-		forward_LightClient_Updates_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_LightClient_GetUpdates_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 
 	})
 
-	mux.Handle("GET", pattern_LightClient_SkipSyncUpdate_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle("GET", pattern_LightClient_GetSkipSyncUpdate_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		rctx, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/ethereum.eth.v1alpha1.LightClient/SkipSyncUpdate")
+		rctx, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/ethereum.eth.v1alpha1.LightClient/GetSkipSyncUpdate")
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_LightClient_SkipSyncUpdate_0(rctx, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_LightClient_GetSkipSyncUpdate_0(rctx, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		ctx = runtime.NewServerMetadataContext(ctx, md)
 		if err != nil {
@@ -139,7 +139,7 @@ func RegisterLightClientHandlerServer(ctx context.Context, mux *runtime.ServeMux
 			return
 		}
 
-		forward_LightClient_SkipSyncUpdate_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_LightClient_GetSkipSyncUpdate_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 
 	})
 
@@ -184,43 +184,43 @@ func RegisterLightClientHandler(ctx context.Context, mux *runtime.ServeMux, conn
 // "LightClientClient" to call the correct interceptors.
 func RegisterLightClientHandlerClient(ctx context.Context, mux *runtime.ServeMux, client LightClientClient) error {
 
-	mux.Handle("GET", pattern_LightClient_Updates_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle("GET", pattern_LightClient_GetUpdates_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		rctx, err := runtime.AnnotateContext(ctx, mux, req, "/ethereum.eth.v1alpha1.LightClient/Updates")
+		rctx, err := runtime.AnnotateContext(ctx, mux, req, "/ethereum.eth.v1alpha1.LightClient/GetUpdates")
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_LightClient_Updates_0(rctx, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_LightClient_GetUpdates_0(rctx, inboundMarshaler, client, req, pathParams)
 		ctx = runtime.NewServerMetadataContext(ctx, md)
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
 
-		forward_LightClient_Updates_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_LightClient_GetUpdates_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 
 	})
 
-	mux.Handle("GET", pattern_LightClient_SkipSyncUpdate_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle("GET", pattern_LightClient_GetSkipSyncUpdate_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		rctx, err := runtime.AnnotateContext(ctx, mux, req, "/ethereum.eth.v1alpha1.LightClient/SkipSyncUpdate")
+		rctx, err := runtime.AnnotateContext(ctx, mux, req, "/ethereum.eth.v1alpha1.LightClient/GetSkipSyncUpdate")
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_LightClient_SkipSyncUpdate_0(rctx, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_LightClient_GetSkipSyncUpdate_0(rctx, inboundMarshaler, client, req, pathParams)
 		ctx = runtime.NewServerMetadataContext(ctx, md)
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
 
-		forward_LightClient_SkipSyncUpdate_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_LightClient_GetSkipSyncUpdate_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 
 	})
 
@@ -228,13 +228,13 @@ func RegisterLightClientHandlerClient(ctx context.Context, mux *runtime.ServeMux
 }
 
 var (
-	pattern_LightClient_Updates_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"eth", "v1alpha1", "light-client", "updates"}, ""))
+	pattern_LightClient_GetUpdates_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"eth", "v1alpha1", "light-client", "updates"}, ""))
 
-	pattern_LightClient_SkipSyncUpdate_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"eth", "v1alpha1", "light-client", "skip-sync"}, ""))
+	pattern_LightClient_GetSkipSyncUpdate_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"eth", "v1alpha1", "light-client", "skip-sync"}, ""))
 )
 
 var (
-	forward_LightClient_Updates_0 = runtime.ForwardResponseMessage
+	forward_LightClient_GetUpdates_0 = runtime.ForwardResponseMessage
 
-	forward_LightClient_SkipSyncUpdate_0 = runtime.ForwardResponseMessage
+	forward_LightClient_GetSkipSyncUpdate_0 = runtime.ForwardResponseMessage
 )

@@ -117,64 +117,39 @@ func (s *Service) maintainQueueLightClientUpdates(ctx context.Context, block blo
 	}
 
 	s.Queue.Enqueue(update)
-
 	tmplog.Println("light-client-update queue", s.Queue.Len(), s.Queue.Cap())
+
+	// Skip Sync
+	currentCom, err := state.CurrentSyncCommittee()
+	if err != nil {
+		return err
+	}
+	currentSyncCommitteeBranch := ztypeState.GetBranch(ztypeState.GetGIndex(22)) // current_sync_committee, 22
+
+	skipSyncUpdate := &ethpb.SkipSyncUpdate{
+		Header:                     header.Header,
+		CurrentSyncCommittee:       currentCom,
+		CurrentSyncCommitteeBranch: currentSyncCommitteeBranch,
+		NextSyncCommittee:          nextCom,
+		NextSyncCommitteeBranch:    nextSyncCommitteeBranch,
+		FinalityHeader:             finalityHeader,
+		FinalityBranch:             finalityCheckpointRootBranch,
+		SyncCommitteeBits:          syncAgg.SyncCommitteeBits,
+		SyncCommitteeSignature:     syncAgg.SyncCommitteeSignature,
+		ForkVersion:                state.Fork().CurrentVersion,
+	}
+
+	s.cfg.Database.SaveSkipSyncUpdate(ctx, skipSyncUpdate)
+
 	//saveSsz(block.Block(), ztypeState, finalityBlock.Block())
 
 	return nil
 }
 
-// Use the blocks to build light-client-updates
-func (s *Service) maintainSkipSyncUpdates(ctx context.Context, block block.SignedBeaconBlock, state state.BeaconState) error {
-	_state := state.(*statev2.BeaconState)
-	ztypeState := ztype.FromBeaconState(_state)
-
-	// Header
-	header, err := block.Header()
-	if err != nil {
-		return err
-	}
-
-	//currentCom := state.CurrentSyncCommittee()
-	nextCom, err := state.NextSyncCommittee()
-	if err != nil {
-		return err
-	}
-	nextSyncCommitteeBranch := ztypeState.GetBranch(ztypeState.GetGIndex(23))
-
-	// Finality information
-	fCheckpoint := state.FinalizedCheckpoint()
-	finalityBlock, err := s.cfg.Database.Block(ctx, bytesutil.ToBytes32(fCheckpoint.Root))
-	if err != nil {
-		return err
-	}
-	signedFinalityHeader, err := finalityBlock.Header()
-	finalityHeader := signedFinalityHeader.Header
-	if err != nil {
-		return err
-	}
-	finalityCheckpointRootBranch := ztypeState.GetBranch(ztypeState.GetGIndex(20, 1))
-
-	syncAgg, err := block.Block().Body().SyncAggregate()
-	if err != nil {
-		return err
-	}
-
-	update := &ethpb.LightClientUpdate{
-		Header:                  header.Header,
-		NextSyncCommittee:       nextCom,
-		NextSyncCommitteeBranch: nextSyncCommitteeBranch,
-		FinalityHeader:          finalityHeader,
-		FinalityBranch:          finalityCheckpointRootBranch,
-		SyncCommitteeBits:       syncAgg.SyncCommitteeBits,
-		SyncCommitteeSignature:  syncAgg.SyncCommitteeSignature,
-		ForkVersion:             state.Fork().CurrentVersion,
-	}
-
-	s.Queue.Enqueue(update)
-
-	tmplog.Println("light-client-update queue", s.Queue.Len(), s.Queue.Cap())
-	//saveSsz(block.Block(), ztypeState, finalityBlock.Block())
-
-	return nil
-}
+//// Use the blocks to build light-client-updates
+//func (s *Service) maintainSkipSyncUpdates(ctx context.Context, block block.SignedBeaconBlock, state state.BeaconState) error {
+//
+//
+//
+//	return nil
+//}

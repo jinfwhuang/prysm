@@ -2,6 +2,8 @@ package light
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/prysmaticlabs/prysm/beacon-chain/light"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
@@ -20,11 +22,7 @@ const (
 	updatesResponseSize = 1
 )
 
-Updates(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*UpdateResponse, error)
-SkipSyncUpdate(ctx context.Context, in *SkipSyncRequest, opts ...grpc.CallOption) (*SkipSyncRequest, error)
-
-
-func (s *Server) Updates(ctx context.Context, _ *empty.Empty) (*ethpb.UpdatesResponse, error) {
+func (s *Server) GetUpdates(ctx context.Context, _ *empty.Empty) (*ethpb.UpdatesResponse, error) {
 	q := s.LightClientService.Queue
 	size := updatesResponseSize
 	if size > q.Len() {
@@ -40,8 +38,11 @@ func (s *Server) Updates(ctx context.Context, _ *empty.Empty) (*ethpb.UpdatesRes
 	return &ethpb.UpdatesResponse{Updates: updates}, nil
 }
 
-func (s *Server) SkipSyncUpdate(ctx context.Context, req *ethpb.SkipSyncRequest) (*ethpb.LightClientUpdate, error) {
-	tmplog.Println("requesting for skip-sync-udpate", req)
+func (s *Server) GetSkipSyncUpdate(ctx context.Context, req *ethpb.SkipSyncRequest) (*ethpb.SkipSyncUpdate, error) {
+	//tmplog.Println("requesting for skip-sync-udpate", req)
+	tmplog.Println("-----------")
+	tmplog.Println("hex    ", hex.EncodeToString(req.Key))
+	tmplog.Println("base64 ", base64.StdEncoding.EncodeToString(req.Key))
 
-	return &ethpb.LightClientUpdate{}, nil
+	return &ethpb.SkipSyncUpdate{}, nil
 }

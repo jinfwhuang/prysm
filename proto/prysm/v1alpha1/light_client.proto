@@ -132,35 +132,36 @@ message SkipSyncUpdate {
 
 // Services
 service LightClient {
-  rpc Updates(google.protobuf.Empty) returns (UpdateResponse) {
+  rpc GetUpdates(google.protobuf.Empty) returns (UpdatesResponse) {
     option (google.api.http) = {
       get: "/eth/v1alpha1/light-client/updates",
     };
   }
-  rpc SkipSyncUpdate(SkipSyncRequest) returns (SkipSyncUpdate) {
+  rpc GetSkipSyncUpdate(SkipSyncRequest) returns (SkipSyncUpdate) {
     option (google.api.http) = {
       get: "/eth/v1alpha1/light-client/skip-sync",
     };
   }
 }
 
-message UpdateResponse {
+message UpdatesResponse {
   repeated LightClientUpdate updates = 1;
 }
 
-// Modify this to use byte ssz_serialize(SkipSyncUpdateKey)
 message SkipSyncRequest {
   // Merkle root of a SyncCommittee, the current sync committee
   bytes key = 1 [(ethereum.eth.ext.ssz_size) = "32"];
 }
 
-message UpdatesResponse {
-  repeated LightClientUpdate updates = 1;
-}
 
-message SkipSyncResponse {
-  SkipSyncUpdate update = 1;
-}
+//message UpdateResponse {
+//  repeated LightClientUpdate updates = 1;
+//}
+
+
+//message SkipSyncResponse {
+//  SkipSyncUpdate update = 1;
+//}
 
 //message SkipSyncRequestKey {
 //  uint64 epoch = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/eth2-types.Epoch"];
