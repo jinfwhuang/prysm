@@ -2,10 +2,9 @@ package light
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/hex"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/prysmaticlabs/prysm/beacon-chain/light"
+	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	tmplog "log"
 )
@@ -32,17 +31,15 @@ func (s *Server) GetUpdates(ctx context.Context, _ *empty.Empty) (*ethpb.Updates
 	_updates := q.Peek(size)
 	for i := 0; i < size; i++ {
 		updates[i] = _updates[i].(*ethpb.LightClientUpdate)
-		//root, _ := updates[i].HashTreeRoot()
-		//tmplog.Println(root)
 	}
 	return &ethpb.UpdatesResponse{Updates: updates}, nil
 }
 
 func (s *Server) GetSkipSyncUpdate(ctx context.Context, req *ethpb.SkipSyncRequest) (*ethpb.SkipSyncUpdate, error) {
-	//tmplog.Println("requesting for skip-sync-udpate", req)
-	tmplog.Println("-----------")
-	tmplog.Println("hex    ", hex.EncodeToString(req.Key))
-	tmplog.Println("base64 ", base64.StdEncoding.EncodeToString(req.Key))
+	update, err := s.LightClientService.GetSkipSyncUpdate(ctx, bytesutil.ToBytes32(req.Key))
+	if err != nil {
+		return nil, err
+	}
 
-	return &ethpb.SkipSyncUpdate{}, nil
+	return update, nil
 }

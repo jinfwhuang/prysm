@@ -2,6 +2,7 @@ package utils
 
 import (
 	"crypto/sha1"
+	"encoding/base64"
 	"encoding/hex"
 
 	///Users/jin/code/repos/prysm/beacon-chain/state/v2
@@ -28,4 +29,8 @@ func HashBytes(b []byte) string {
 	h := sha1.New()
 	h.Write(b)
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func Base64Str(b []byte) string {
+	return base64.StdEncoding.EncodeToString(b)
 }

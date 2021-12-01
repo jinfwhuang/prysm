@@ -88,25 +88,9 @@ func (s *Service) Status() error {
 	return nil
 }
 
-//func (s *Service) BestUpdateForPeriod(ctx context.Context, period uint64) (*ethpb.LightClientUpdate, error) {
-//	s.lock.RLock()
-//	defer s.lock.RUnlock()
-//	update, ok := s.bestUpdateByPeriod[period]
-//	if !ok {
-//		return nil, fmt.Errorf("no update found for period %d", period)
-//	}
-//	return update, nil
-//}
-//
-//func (s *Service) LatestFinalizedUpdate(ctx context.Context) *ethpb.LightClientUpdate {
-//	s.lock.RLock()
-//	defer s.lock.RUnlock()
-//	return s.latestFinalizedUpdate
-//}
-//
-//func (s *Service) LatestNonFinalizedUpdate(ctx context.Context) *ethpb.LightClientUpdate {
-//	return s.latestNonFinalizedUpdate
-//}
+func (s *Service) GetSkipSyncUpdate(ctx context.Context, key [32]byte) (*ethpb.SkipSyncUpdate, error) {
+	return s.cfg.Database.GetSkipSyncUpdate(ctx, key)
+}
 
 func (s *Service) run() {
 	ctx, cancel := context.WithCancel(context.Background())

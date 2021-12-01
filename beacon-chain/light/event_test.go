@@ -130,3 +130,27 @@ func Test_FinalityHeaderBranch2(t *testing.T) {
 	tmplog.Println("finalized checkpoint", hex0x(state.State.FinalizedCheckpoint().Root))
 	tmplog.Println("finalityBlock root  ", hex0x(finalityBlockRoot[:]))
 }
+
+func Test_NumOfSetBits(t *testing.T) {
+	//_filename := "08eb3e781e76cf041406c71c5c48567874b8f1068c31f5f8324701e5278a128d.ssz"
+	//filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/beacon-state/" + _filename
+	//sszbytes, err := file.ReadFileAsBytes(filename)
+	//require.NoError(t, err)
+	//state := ztype.FromSszBytes(sszbytes)
+
+	_filename := "147e2adcac6cf5424d6d36251b247b2633483b8d51e917742a88e527c9d83778.ssz"
+	filename := "/Users/jin/code/repos/prysm/tmp/ssz/keep/block/" + _filename
+	sszbytes, err := file.ReadFileAsBytes(filename)
+	require.NoError(t, err)
+	//block := wrapper.altairBeaconBlock{}
+	finalityBlock := eth.BeaconBlockAltair{}
+	err = finalityBlock.UnmarshalSSZ(sszbytes)
+	require.NoError(t, err)
+
+	syncAgg := finalityBlock.Body.SyncAggregate
+
+	bitField := syncAgg.SyncCommitteeBits
+
+	NumOfSetBits(bitField)
+
+}

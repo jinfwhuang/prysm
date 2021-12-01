@@ -2,11 +2,11 @@ package light
 
 import (
 	"context"
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/feed"
 	statefeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
-
 	//vv1 "github.com/prysmaticlabs/prysm/beacon-chain/state/v1"
 	statev2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
 	log "github.com/sirupsen/logrus"
@@ -139,11 +139,63 @@ func (s *Service) maintainQueueLightClientUpdates(ctx context.Context, block blo
 		ForkVersion:                state.Fork().CurrentVersion,
 	}
 
+	skipSyncUpdate = s.bestSkipSyncUpdate(ctx, skipSyncUpdate)
+
 	s.cfg.Database.SaveSkipSyncUpdate(ctx, skipSyncUpdate)
 
 	//saveSsz(block.Block(), ztypeState, finalityBlock.Block())
 
 	return nil
+}
+
+// TODO: improve on how to choose which SkipSyncUpdate to keep
+func (s *Service) bestSkipSyncUpdate(ctx context.Context, newUpdate *ethpb.SkipSyncUpdate) *ethpb.SkipSyncUpdate {
+	key, err := newUpdate.CurrentSyncCommittee.HashTreeRoot()
+	if err != nil {
+		panic(err)
+	}
+	update, err := s.GetSkipSyncUpdate(ctx, bytesutil.ToBytes32(key[:]))
+	if err != nil {
+		return newUpdate
+	}
+
+	oldParticipation := numOfSetBits(update.SyncCommitteeBits)
+	newParticipation := numOfSetBits(newUpdate.SyncCommitteeBits)
+
+	tmplog.Println("oldParticipation", oldParticipation, "newParticipation", newParticipation)
+
+	// Criteria 1: Compare which update has the most participation
+	if newParticipation >= oldParticipation {
+		return newUpdate
+	} else {
+		return update
+	}
+}
+
+func numOfSetBits(b []byte) int {
+	bitStr := fmt.Sprintf("%08b", b)
+	// TODO: hack; use bit operation instead
+	count := 0
+	countZero := 0
+	for _, c := range bitStr {
+		if c == '1' {
+			count += 1
+		} else if c == '0' {
+			countZero += 1
+		}
+	}
+	if count+countZero != 512 { // TODO: Hack
+		panic("bit field is not 512")
+	}
+
+	//count := uint64(0)
+	//for n != 0 {
+	//	count += n & 1
+	//	n >>= 1
+	//}
+	//tmplog.Println("count", count)
+
+	return count
 }
 
 //// Use the blocks to build light-client-updates
