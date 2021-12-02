@@ -3,6 +3,7 @@ package ztype
 import (
 	"context"
 	"crypto/sha1"
+	"encoding/base64"
 	"encoding/hex"
 	"github.com/prysmaticlabs/prysm/io/file"
 	"github.com/prysmaticlabs/prysm/testing/require"
@@ -132,6 +133,8 @@ func Test_FinalityHeaderBranch(t *testing.T) {
 	sszbytes, err := file.ReadFileAsBytes(filename)
 	require.NoError(t, err)
 	state := FromSszBytes(sszbytes)
+
+	tmplog.Println(base64.StdEncoding.EncodeToString(state.State.GenesisValidatorRoot()))
 
 	root := state.HashTreeRoot()
 	gIndex := state.GetGIndex(20, 1) // finalized_checkpoint (20), root (1)

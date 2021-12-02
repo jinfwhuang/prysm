@@ -103,6 +103,11 @@ type ZtypBeaconStateAltair struct {
 	State *stateV2.BeaconState
 }
 
+func NewEmptyBeaconState() *ZtypBeaconStateAltair {
+	v2State := &stateV2.BeaconState{}
+	return FromBeaconState(v2State)
+}
+
 // TODO: hack; remove before merge
 func PanicErr(e error) {
 	if e != nil {

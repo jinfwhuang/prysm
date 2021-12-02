@@ -1,0 +1,218 @@
+package sync
+
+import (
+	"encoding/base64"
+	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
+	tmplog "log"
+	"math"
+
+	"github.com/pkg/errors"
+	"github.com/prysmaticlabs/prysm/beacon-chain/core/signing"
+	"github.com/prysmaticlabs/prysm/config/params"
+	"github.com/prysmaticlabs/prysm/crypto/bls/blst"
+	"github.com/prysmaticlabs/prysm/crypto/bls/common"
+	//v1alpha1 "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
+	eth2_types "github.com/prysmaticlabs/eth2-types"
+	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/time/slots"
+	"google.golang.org/protobuf/proto"
+)
+
+const GenesisValidatorsRootBase64Str = "SzY9uU4oYSDXbrkFNA/dTlS/6fBr8z/2z1rSf1Eb/pU="
+
+var GenesisValidatorsRoot [32]byte
+
+func init() {
+	b, err := base64.StdEncoding.DecodeString(GenesisValidatorsRootBase64Str)
+	if err != nil {
+		panic(err)
+	}
+	GenesisValidatorsRoot = bytesutil.ToBytes32(b)
+}
+
+// TODO: refactor
+func verifyFinalityBranch(update *ethpb.LightClientUpdate) bool {
+
+	//root tree.Root, gIndex tree.Gindex64, leaf tree.Root, branch [][]byte
+	emptyZtypeState := ztype.NewEmptyBeaconState()
+
+	root := update.FinalityHeader.StateRoot
+	gIndex := emptyZtypeState.GetGIndex(20, 1) // finalized_checkpoint (20), root (1)
+	leaf, err := update.Header.HashTreeRoot()  // ??? Is this hashroot correct? fastszz issue?
+	if err != nil {
+		tmplog.Println(err)
+	}
+	branch := update.FinalityBranch
+
+	return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
+}
+
+// TODO: ??
+func verifyNextSyncCommProof(update *ethpb.LightClientUpdate) bool {
+	return true
+}
+
+// See: https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/sync-protocol.md#validate_light_client_update
+func validateLightClientUpdate(
+	snapshot *ethpb.LightClientSnapshot,
+	update *ethpb.LightClientUpdate,
+	genesisValidatorsRoot [32]byte,
+) error {
+	if update.Header.Slot <= snapshot.Header.Slot {
+		return errors.New("wrong")
+	}
+	snapshotPeriod := slots.ToEpoch(snapshot.Header.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
+	updatePeriod := slots.ToEpoch(update.Header.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
+	if updatePeriod != snapshotPeriod || updatePeriod != snapshotPeriod+1 {
+		return errors.New("unwanted")
+	}
+
+	// Verify finality headers.
+	var signedHeader *ethpb.BeaconBlockHeader
+	if isEmptyBlockHeader(update.FinalityHeader) {
+		signedHeader = update.Header
+		// Check if branch is empty.
+		for _, elem := range update.FinalityBranch {
+			if len(elem) != 0 { // TODO: potential error
+				return errors.New("branch not empty")
+			}
+		}
+	} else {
+		signedHeader = update.FinalityHeader
+		if !verifyFinalityBranch(update) {
+			return errors.New("finality branch does not verify")
+		}
+	}
+
+	// Verify update next sync committee if the update period incremented.
+	var syncCommittee *ethpb.SyncCommittee
+	if updatePeriod == snapshotPeriod {
+		syncCommittee = snapshot.CurrentSyncCommittee
+		for _, elem := range update.NextSyncCommitteeBranch {
+			if len(elem) != 0 { // TODO: potential error
+				return errors.New("branch not empty")
+			}
+		}
+	} else {
+		syncCommittee = snapshot.NextSyncCommittee
+		verifyNextSyncCommProof(update)
+	}
+
+	// Verify sync committee has sufficient participants
+	if update.SyncCommitteeBits.Count() < params.BeaconConfig().MinSyncCommitteeParticipants {
+		return errors.New("insufficient participants")
+	}
+
+	// Verify sync committee aggregate signature
+	participantPubkeys := make([][]byte, 0)
+	for i, pubKey := range syncCommittee.Pubkeys {
+		bit := update.SyncCommitteeBits.BitAt(uint64(i))
+		if bit {
+			participantPubkeys = append(participantPubkeys, pubKey)
+		}
+	}
+	domain, err := signing.ComputeDomain(
+		params.BeaconConfig().DomainSyncCommittee,
+		update.ForkVersion,
+		genesisValidatorsRoot[:],
+	)
+	if err != nil {
+		return err
+	}
+	signingRoot, err := signing.ComputeSigningRoot(signedHeader, domain)
+	if err != nil {
+		return err
+	}
+	sig, err := blst.SignatureFromBytes(update.SyncCommitteeSignature[:])
+	if err != nil {
+		return err
+	}
+	pubKeys := make([]common.PublicKey, 0)
+	for _, pubkey := range participantPubkeys {
+		pk, err := blst.PublicKeyFromBytes(pubkey)
+		if err != nil {
+			return err
+		}
+		pubKeys = append(pubKeys, pk)
+	}
+	if !sig.FastAggregateVerify(pubKeys, signingRoot) {
+		return errors.New("failed to verify")
+	}
+	return nil
+}
+
+func isEmptyBlockHeader(header *ethpb.BeaconBlockHeader) bool {
+	emptyRoot := params.BeaconConfig().ZeroHash
+	return proto.Equal(header, &ethpb.BeaconBlockHeader{
+		Slot:          0,
+		ProposerIndex: 0,
+		ParentRoot:    emptyRoot[:],
+		StateRoot:     emptyRoot[:],
+		BodyRoot:      emptyRoot[:],
+	})
+}
+
+func getSubtreeIndex(index uint64) uint64 {
+	return index % uint64(math.Pow(2, floorLog2(index)))
+}
+
+func floorLog2(x uint64) float64 {
+	return math.Floor(math.Log2(float64(x)))
+}
+
+func applyLightClientUpdate(snapshot *ethpb.LightClientSnapshot, update *ethpb.LightClientUpdate) {
+	snapshotPeriod := slots.ToEpoch(snapshot.Header.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
+	updatePeriod := slots.ToEpoch(update.Header.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
+	if updatePeriod == snapshotPeriod+1 {
+		snapshot.CurrentSyncCommittee = snapshot.NextSyncCommittee
+	} else {
+		snapshot.Header = update.Header
+	}
+}
+
+/**
+def process_light_client_update(store: LightClientStore, update: LightClientUpdate, current_slot: Slot,
+                                genesis_validators_root: Root) -> None:
+*/
+func processLightClientUpdate(
+	store *ethpb.LightClientStore,
+	update *ethpb.LightClientUpdate,
+	currentSlot eth2_types.Slot,
+	genesisValidatorsRoot [32]byte,
+) error {
+	//store := s.store
+	//currentSlot := s.store.Store.Header.Slot
+
+	if err := validateLightClientUpdate(store.Store, update, genesisValidatorsRoot); err != nil {
+		return err
+	}
+
+	store.Updates = append(store.Updates, update)
+	updateTimeout := uint64(params.BeaconConfig().SlotsPerEpoch) * uint64(params.BeaconConfig().EpochsPerSyncCommitteePeriod)
+	sumParticipantBits := update.SyncCommitteeBits.Count()
+	hasQuorum := sumParticipantBits*3 >= uint64(len(update.SyncCommitteeBits))*2 // TODO
+	if hasQuorum && !isEmptyBlockHeader(update.FinalityHeader) {
+		// Apply update if (1) 2/3 quorum is reached and (2) we have a finality proof.
+		// Note that (2) means that the current light client design needs finality.
+		// It may be changed to re-organizable light client design. See the on-going issue consensus-specs#2182.
+		applyLightClientUpdate(store.Store, update)
+		store.Updates = make([]*ethpb.LightClientUpdate, 0)
+	} else if currentSlot > store.Store.Header.Slot.Add(updateTimeout) {
+		// Forced best update when the update timeout has elapsed
+		//// Use the update that has the highest sum of sync committee bits.
+		//updateWithHighestSumBits := store.Updates[0]
+		//highestSumBitsUpdate := updateWithHighestSumBits.SyncCommitteeBits.Count()
+		//for _, validUpdate := range store.Updates {
+		//	sumUpdateBits := validUpdate.SyncCommitteeBits.Count()
+		//	if sumUpdateBits > highestSumBitsUpdate {
+		//		highestSumBitsUpdate = sumUpdateBits
+		//		updateWithHighestSumBits = validUpdate
+		//	}
+		//}
+		bestUpdate := store.Updates[0] // TODO: hack
+		applyLightClientUpdate(store.Store, bestUpdate)
+		store.Updates = make([]*ethpb.LightClientUpdate, 0)
+	}
+	return nil
+}

@@ -171,25 +171,20 @@ func (s *Service) processSkipSyncUpdate(update *ethpb.SkipSyncUpdate) {
 }
 
 func (s *Service) processLightClientUpdate(update *ethpb.LightClientUpdate) {
-
+	processLightClientUpdate(s.store, update, s.store.Store.Header.Slot, GenesisValidatorsRoot)
 }
 
-func validateSkipSyncUpdate(update *ethpb.SkipSyncUpdate) bool {
-	// TODO
-	return true
-}
-
-func (s *Service) process(ctx context.Context) {
-
-	count := 0
-	for {
-
-		tmplog.Println("processing", count)
-		time.Sleep(time.Second * 10)
-		count += 1
-	}
-	tmplog.Println("xxx light client sync done processing xxx")
-}
+//func (s *Service) process(ctx context.Context) {
+//
+//	count := 0
+//	for {
+//
+//		tmplog.Println("processing", count)
+//		time.Sleep(time.Second * 10)
+//		count += 1
+//	}
+//	tmplog.Println("xxx light client sync done processing xxx")
+//}
 
 // Stop the blockchain service's main event loop and associated goroutines.
 func (s *Service) Stop() error {
