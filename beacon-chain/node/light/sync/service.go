@@ -1,5 +1,3 @@
-// Package blockchain defines the life-cycle of the blockchain at the core of
-// Ethereum, including processing of new blocks and attestations using proof of stake.
 package sync
 
 import (
@@ -9,9 +7,13 @@ import (
 	"time"
 )
 
-// headSyncMinEpochsAfterCheckpoint defines how many epochs should elapse after known finalization
-// checkpoint for head sync to be triggered.
-const headSyncMinEpochsAfterCheckpoint = 128
+/**
+Design:
+1. The service keep track of "store"
+2. The service save the latest store to disk
+
+3. The service recove from "store"
+*/
 
 type Service struct {
 	cfg    *config
@@ -21,11 +23,18 @@ type Service struct {
 	//head                  *head
 	//headLock              sync.RWMutex
 	//genesisRoot           [32]byte
-	finalizedCheckpt *ethpb.Checkpoint
-	blockHeader      *ethpb.BeaconBlockHeader
+	//finalizedCheckpt *ethpb.Checkpoint
+	//blockHeader      *ethpb.BeaconBlockHeader
 	//justifiedBalances     []uint64
 	//justifiedBalances *stateBalanceCache
 	//wsVerifier        *WeakSubjectivityVerifier
+	//*ethpb.ClientSnapshot
+	store *Store
+}
+
+type Store struct {
+	Snapshot     *ethpb.ClientSnapshot
+	ValidUpdates []*ethpb.LightClientUpdate
 }
 
 // config options for the service.
@@ -65,8 +74,6 @@ func (s *Service) Start() {
 	go s.process(s.ctx)
 }
 
-// processChainStartTime initializes a series of deposits from the ChainStart deposits in the eth1
-// deposit contract, initializes the beacon chain's state, and kicks off the beacon chain.
 func (s *Service) process(ctx context.Context) {
 	count := 0
 	for {

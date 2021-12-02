@@ -100,10 +100,16 @@ func (b *LightNode) registerRpcService() error {
 	tmplog.Println(port)
 	tmplog.Println(maxMsgSize)
 
+	var lightsyncService *lightsync.Service
+	if err := b.services.FetchService(&lightsyncService); err != nil {
+		return err
+	}
+
 	svc, err := lightrpc.NewService(b.ctx, &lightrpc.Config{
-		Host:       host,
-		Port:       port,
-		MaxMsgSize: maxMsgSize,
+		Host:        host,
+		Port:        port,
+		MaxMsgSize:  maxMsgSize,
+		SyncService: lightsyncService,
 	})
 	if err != nil {
 		panic(err)

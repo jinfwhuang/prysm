@@ -1,4 +1,4 @@
-package main
+package sync
 
 import (
 	"math"
@@ -17,8 +17,8 @@ import (
 )
 
 func validateLightClientUpdate(
-	snapshot *LightClientSnapshot,
-	update *LightClientUpdate,
+	snapshot *main.LightClientSnapshot,
+	update *main.LightClientUpdate,
 	genesisValidatorsRoot [32]byte,
 ) error {
 	if update.Header.Slot <= snapshot.Header.Slot {
@@ -45,8 +45,8 @@ func validateLightClientUpdate(
 		if err != nil {
 			return err
 		}
-		depth := FinalizedRootIndexFloorLog2
-		index := getSubtreeIndex(FinalizedRootIndex)
+		depth := main.FinalizedRootIndexFloorLog2
+		index := getSubtreeIndex(main.FinalizedRootIndex)
 		root := update.FinalityHeader.StateRoot
 		merkleBranch := make([][]byte, len(update.FinalityBranch))
 		for i, item := range update.FinalityBranch {
@@ -76,8 +76,8 @@ func validateLightClientUpdate(
 		if err != nil {
 			return err
 		}
-		depth := NextSyncCommitteeIndexFloorLog2
-		index := getSubtreeIndex(NextSyncCommitteeIndex)
+		depth := main.NextSyncCommitteeIndexFloorLog2
+		index := getSubtreeIndex(main.NextSyncCommitteeIndex)
 		root := update.Header.StateRoot
 		merkleBranch := make([][]byte, len(update.NextSyncCommitteeBranch))
 		for i, item := range update.NextSyncCommitteeBranch {

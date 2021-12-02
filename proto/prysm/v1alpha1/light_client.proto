@@ -81,8 +81,17 @@ GET /eth/light-client/v1/skip-sync-update?key=<content-key>
 GET /eth/light-client/v1/updates
 
  */
+//    type Store struct {
+//Snapshot     *ethpb.ClientSnapshot
+//    ValidUpdates []*ethpb.LightClientUpdate
+//    }
 
-message ClientSnapshot {
+message LightClientStore {
+  ethereum.eth.v1alpha1.LightClientSnapshot store = 1;
+  repeated ethereum.eth.v1alpha1.LightClientUpdate updates = 2;
+}
+
+message LightClientSnapshot {
   ethereum.eth.v1alpha1.BeaconBlockHeader header = 1;
   ethereum.eth.v1alpha1.SyncCommittee current_sync_committee = 2;
   ethereum.eth.v1alpha1.SyncCommittee next_sync_committee = 3;
