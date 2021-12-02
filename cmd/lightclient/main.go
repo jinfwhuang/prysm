@@ -4,9 +4,8 @@ import (
 	"github.com/prysmaticlabs/go-bitfield"
 	"github.com/prysmaticlabs/prysm/cmd"
 	"github.com/prysmaticlabs/prysm/cmd/beacon-chain/flags"
+	lightnode "github.com/prysmaticlabs/prysm/cmd/lightclient/node"
 
-	//"github.com/prysmaticlabs/prysm/beacon-chain/light"
-	lightnode "github.com/prysmaticlabs/prysm/beacon-chain/node/light"
 	v1 "github.com/prysmaticlabs/prysm/proto/eth/v1"
 	v2 "github.com/prysmaticlabs/prysm/proto/eth/v2"
 	v1alpha1 "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"

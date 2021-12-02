@@ -34,18 +34,17 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
-type ClientSnapshot struct {
+type LightClientStore struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Header               *BeaconBlockHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
-	CurrentSyncCommittee *SyncCommittee     `protobuf:"bytes,2,opt,name=current_sync_committee,json=currentSyncCommittee,proto3" json:"current_sync_committee,omitempty"`
-	NextSyncCommittee    *SyncCommittee     `protobuf:"bytes,3,opt,name=next_sync_committee,json=nextSyncCommittee,proto3" json:"next_sync_committee,omitempty"`
+	Store   *LightClientSnapshot `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
+	Updates []*LightClientUpdate `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
 }
 
-func (x *ClientSnapshot) Reset() {
-	*x = ClientSnapshot{}
+func (x *LightClientStore) Reset() {
+	*x = LightClientStore{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -53,13 +52,13 @@ func (x *ClientSnapshot) Reset() {
 	}
 }
 
-func (x *ClientSnapshot) String() string {
+func (x *LightClientStore) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ClientSnapshot) ProtoMessage() {}
+func (*LightClientStore) ProtoMessage() {}
 
-func (x *ClientSnapshot) ProtoReflect() protoreflect.Message {
+func (x *LightClientStore) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -71,26 +70,82 @@ func (x *ClientSnapshot) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ClientSnapshot.ProtoReflect.Descriptor instead.
-func (*ClientSnapshot) Descriptor() ([]byte, []int) {
+// Deprecated: Use LightClientStore.ProtoReflect.Descriptor instead.
+func (*LightClientStore) Descriptor() ([]byte, []int) {
 	return file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ClientSnapshot) GetHeader() *BeaconBlockHeader {
+func (x *LightClientStore) GetStore() *LightClientSnapshot {
+	if x != nil {
+		return x.Store
+	}
+	return nil
+}
+
+func (x *LightClientStore) GetUpdates() []*LightClientUpdate {
+	if x != nil {
+		return x.Updates
+	}
+	return nil
+}
+
+type LightClientSnapshot struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Header               *BeaconBlockHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	CurrentSyncCommittee *SyncCommittee     `protobuf:"bytes,2,opt,name=current_sync_committee,json=currentSyncCommittee,proto3" json:"current_sync_committee,omitempty"`
+	NextSyncCommittee    *SyncCommittee     `protobuf:"bytes,3,opt,name=next_sync_committee,json=nextSyncCommittee,proto3" json:"next_sync_committee,omitempty"`
+}
+
+func (x *LightClientSnapshot) Reset() {
+	*x = LightClientSnapshot{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *LightClientSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LightClientSnapshot) ProtoMessage() {}
+
+func (x *LightClientSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LightClientSnapshot.ProtoReflect.Descriptor instead.
+func (*LightClientSnapshot) Descriptor() ([]byte, []int) {
+	return file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *LightClientSnapshot) GetHeader() *BeaconBlockHeader {
 	if x != nil {
 		return x.Header
 	}
 	return nil
 }
 
-func (x *ClientSnapshot) GetCurrentSyncCommittee() *SyncCommittee {
+func (x *LightClientSnapshot) GetCurrentSyncCommittee() *SyncCommittee {
 	if x != nil {
 		return x.CurrentSyncCommittee
 	}
 	return nil
 }
 
-func (x *ClientSnapshot) GetNextSyncCommittee() *SyncCommittee {
+func (x *LightClientSnapshot) GetNextSyncCommittee() *SyncCommittee {
 	if x != nil {
 		return x.NextSyncCommittee
 	}
@@ -115,7 +170,7 @@ type LightClientUpdate struct {
 func (x *LightClientUpdate) Reset() {
 	*x = LightClientUpdate{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[1]
+		mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -128,7 +183,7 @@ func (x *LightClientUpdate) String() string {
 func (*LightClientUpdate) ProtoMessage() {}
 
 func (x *LightClientUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[1]
+	mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -141,7 +196,7 @@ func (x *LightClientUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LightClientUpdate.ProtoReflect.Descriptor instead.
 func (*LightClientUpdate) Descriptor() ([]byte, []int) {
-	return file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP(), []int{1}
+	return file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *LightClientUpdate) GetHeader() *BeaconBlockHeader {
@@ -220,7 +275,7 @@ type SkipSyncUpdate struct {
 func (x *SkipSyncUpdate) Reset() {
 	*x = SkipSyncUpdate{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[2]
+		mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -233,7 +288,7 @@ func (x *SkipSyncUpdate) String() string {
 func (*SkipSyncUpdate) ProtoMessage() {}
 
 func (x *SkipSyncUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[2]
+	mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -246,7 +301,7 @@ func (x *SkipSyncUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SkipSyncUpdate.ProtoReflect.Descriptor instead.
 func (*SkipSyncUpdate) Descriptor() ([]byte, []int) {
-	return file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP(), []int{2}
+	return file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SkipSyncUpdate) GetHeader() *BeaconBlockHeader {
@@ -330,7 +385,7 @@ type UpdatesResponse struct {
 func (x *UpdatesResponse) Reset() {
 	*x = UpdatesResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[3]
+		mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -343,7 +398,7 @@ func (x *UpdatesResponse) String() string {
 func (*UpdatesResponse) ProtoMessage() {}
 
 func (x *UpdatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[3]
+	mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -356,7 +411,7 @@ func (x *UpdatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatesResponse.ProtoReflect.Descriptor instead.
 func (*UpdatesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP(), []int{3}
+	return file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UpdatesResponse) GetUpdates() []*LightClientUpdate {
@@ -377,7 +432,7 @@ type SkipSyncRequest struct {
 func (x *SkipSyncRequest) Reset() {
 	*x = SkipSyncRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[4]
+		mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -390,7 +445,7 @@ func (x *SkipSyncRequest) String() string {
 func (*SkipSyncRequest) ProtoMessage() {}
 
 func (x *SkipSyncRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[4]
+	mi := &file_proto_prysm_v1alpha1_light_client_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -403,7 +458,7 @@ func (x *SkipSyncRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SkipSyncRequest.ProtoReflect.Descriptor instead.
 func (*SkipSyncRequest) Descriptor() ([]byte, []int) {
-	return file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP(), []int{4}
+	return file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SkipSyncRequest) GetKey() []byte {
@@ -435,8 +490,18 @@ var file_proto_prysm_v1alpha1_light_client_proto_rawDesc = []byte{
 	0x62, 0x65, 0x61, 0x63, 0x6f, 0x6e, 0x5f, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x2e, 0x70, 0x72, 0x6f,
 	0x74, 0x6f, 0x1a, 0x29, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x70, 0x72, 0x79, 0x73, 0x6d, 0x2f,
 	0x76, 0x31, 0x61, 0x6c, 0x70, 0x68, 0x61, 0x31, 0x2f, 0x73, 0x79, 0x6e, 0x63, 0x5f, 0x63, 0x6f,
-	0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x84, 0x02,
-	0x0a, 0x0e, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x53, 0x6e, 0x61, 0x70, 0x73, 0x68, 0x6f, 0x74,
+	0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x98, 0x01,
+	0x0a, 0x10, 0x4c, 0x69, 0x67, 0x68, 0x74, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x53, 0x74, 0x6f,
+	0x72, 0x65, 0x12, 0x40, 0x0a, 0x05, 0x73, 0x74, 0x6f, 0x72, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x2a, 0x2e, 0x65, 0x74, 0x68, 0x65, 0x72, 0x65, 0x75, 0x6d, 0x2e, 0x65, 0x74, 0x68,
+	0x2e, 0x76, 0x31, 0x61, 0x6c, 0x70, 0x68, 0x61, 0x31, 0x2e, 0x4c, 0x69, 0x67, 0x68, 0x74, 0x43,
+	0x6c, 0x69, 0x65, 0x6e, 0x74, 0x53, 0x6e, 0x61, 0x70, 0x73, 0x68, 0x6f, 0x74, 0x52, 0x05, 0x73,
+	0x74, 0x6f, 0x72, 0x65, 0x12, 0x42, 0x0a, 0x07, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x73, 0x18,
+	0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x28, 0x2e, 0x65, 0x74, 0x68, 0x65, 0x72, 0x65, 0x75, 0x6d,
+	0x2e, 0x65, 0x74, 0x68, 0x2e, 0x76, 0x31, 0x61, 0x6c, 0x70, 0x68, 0x61, 0x31, 0x2e, 0x4c, 0x69,
+	0x67, 0x68, 0x74, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52,
+	0x07, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x73, 0x22, 0x89, 0x02, 0x0a, 0x13, 0x4c, 0x69, 0x67,
+	0x68, 0x74, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x53, 0x6e, 0x61, 0x70, 0x73, 0x68, 0x6f, 0x74,
 	0x12, 0x40, 0x0a, 0x06, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b,
 	0x32, 0x28, 0x2e, 0x65, 0x74, 0x68, 0x65, 0x72, 0x65, 0x75, 0x6d, 0x2e, 0x65, 0x74, 0x68, 0x2e,
 	0x76, 0x31, 0x61, 0x6c, 0x70, 0x68, 0x61, 0x31, 0x2e, 0x42, 0x65, 0x61, 0x63, 0x6f, 0x6e, 0x42,
@@ -604,42 +669,45 @@ func file_proto_prysm_v1alpha1_light_client_proto_rawDescGZIP() []byte {
 	return file_proto_prysm_v1alpha1_light_client_proto_rawDescData
 }
 
-var file_proto_prysm_v1alpha1_light_client_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_proto_prysm_v1alpha1_light_client_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_proto_prysm_v1alpha1_light_client_proto_goTypes = []interface{}{
-	(*ClientSnapshot)(nil),    // 0: ethereum.eth.v1alpha1.ClientSnapshot
-	(*LightClientUpdate)(nil), // 1: ethereum.eth.v1alpha1.LightClientUpdate
-	(*SkipSyncUpdate)(nil),    // 2: ethereum.eth.v1alpha1.SkipSyncUpdate
-	(*UpdatesResponse)(nil),   // 3: ethereum.eth.v1alpha1.UpdatesResponse
-	(*SkipSyncRequest)(nil),   // 4: ethereum.eth.v1alpha1.SkipSyncRequest
-	(*BeaconBlockHeader)(nil), // 5: ethereum.eth.v1alpha1.BeaconBlockHeader
-	(*SyncCommittee)(nil),     // 6: ethereum.eth.v1alpha1.SyncCommittee
-	(*empty.Empty)(nil),       // 7: google.protobuf.Empty
+	(*LightClientStore)(nil),    // 0: ethereum.eth.v1alpha1.LightClientStore
+	(*LightClientSnapshot)(nil), // 1: ethereum.eth.v1alpha1.LightClientSnapshot
+	(*LightClientUpdate)(nil),   // 2: ethereum.eth.v1alpha1.LightClientUpdate
+	(*SkipSyncUpdate)(nil),      // 3: ethereum.eth.v1alpha1.SkipSyncUpdate
+	(*UpdatesResponse)(nil),     // 4: ethereum.eth.v1alpha1.UpdatesResponse
+	(*SkipSyncRequest)(nil),     // 5: ethereum.eth.v1alpha1.SkipSyncRequest
+	(*BeaconBlockHeader)(nil),   // 6: ethereum.eth.v1alpha1.BeaconBlockHeader
+	(*SyncCommittee)(nil),       // 7: ethereum.eth.v1alpha1.SyncCommittee
+	(*empty.Empty)(nil),         // 8: google.protobuf.Empty
 }
 var file_proto_prysm_v1alpha1_light_client_proto_depIdxs = []int32{
-	5,  // 0: ethereum.eth.v1alpha1.ClientSnapshot.header:type_name -> ethereum.eth.v1alpha1.BeaconBlockHeader
-	6,  // 1: ethereum.eth.v1alpha1.ClientSnapshot.current_sync_committee:type_name -> ethereum.eth.v1alpha1.SyncCommittee
-	6,  // 2: ethereum.eth.v1alpha1.ClientSnapshot.next_sync_committee:type_name -> ethereum.eth.v1alpha1.SyncCommittee
-	5,  // 3: ethereum.eth.v1alpha1.LightClientUpdate.header:type_name -> ethereum.eth.v1alpha1.BeaconBlockHeader
-	6,  // 4: ethereum.eth.v1alpha1.LightClientUpdate.next_sync_committee:type_name -> ethereum.eth.v1alpha1.SyncCommittee
-	5,  // 5: ethereum.eth.v1alpha1.LightClientUpdate.finality_header:type_name -> ethereum.eth.v1alpha1.BeaconBlockHeader
-	5,  // 6: ethereum.eth.v1alpha1.SkipSyncUpdate.header:type_name -> ethereum.eth.v1alpha1.BeaconBlockHeader
-	6,  // 7: ethereum.eth.v1alpha1.SkipSyncUpdate.current_sync_committee:type_name -> ethereum.eth.v1alpha1.SyncCommittee
-	6,  // 8: ethereum.eth.v1alpha1.SkipSyncUpdate.next_sync_committee:type_name -> ethereum.eth.v1alpha1.SyncCommittee
-	5,  // 9: ethereum.eth.v1alpha1.SkipSyncUpdate.finality_header:type_name -> ethereum.eth.v1alpha1.BeaconBlockHeader
-	1,  // 10: ethereum.eth.v1alpha1.UpdatesResponse.updates:type_name -> ethereum.eth.v1alpha1.LightClientUpdate
-	7,  // 11: ethereum.eth.v1alpha1.LightClient.GetUpdates:input_type -> google.protobuf.Empty
-	4,  // 12: ethereum.eth.v1alpha1.LightClient.GetSkipSyncUpdate:input_type -> ethereum.eth.v1alpha1.SkipSyncRequest
-	7,  // 13: ethereum.eth.v1alpha1.LightNode.Head:input_type -> google.protobuf.Empty
-	7,  // 14: ethereum.eth.v1alpha1.LightNode.FinalizedHead:input_type -> google.protobuf.Empty
-	3,  // 15: ethereum.eth.v1alpha1.LightClient.GetUpdates:output_type -> ethereum.eth.v1alpha1.UpdatesResponse
-	2,  // 16: ethereum.eth.v1alpha1.LightClient.GetSkipSyncUpdate:output_type -> ethereum.eth.v1alpha1.SkipSyncUpdate
-	5,  // 17: ethereum.eth.v1alpha1.LightNode.Head:output_type -> ethereum.eth.v1alpha1.BeaconBlockHeader
-	5,  // 18: ethereum.eth.v1alpha1.LightNode.FinalizedHead:output_type -> ethereum.eth.v1alpha1.BeaconBlockHeader
-	15, // [15:19] is the sub-list for method output_type
-	11, // [11:15] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	1,  // 0: ethereum.eth.v1alpha1.LightClientStore.store:type_name -> ethereum.eth.v1alpha1.LightClientSnapshot
+	2,  // 1: ethereum.eth.v1alpha1.LightClientStore.updates:type_name -> ethereum.eth.v1alpha1.LightClientUpdate
+	6,  // 2: ethereum.eth.v1alpha1.LightClientSnapshot.header:type_name -> ethereum.eth.v1alpha1.BeaconBlockHeader
+	7,  // 3: ethereum.eth.v1alpha1.LightClientSnapshot.current_sync_committee:type_name -> ethereum.eth.v1alpha1.SyncCommittee
+	7,  // 4: ethereum.eth.v1alpha1.LightClientSnapshot.next_sync_committee:type_name -> ethereum.eth.v1alpha1.SyncCommittee
+	6,  // 5: ethereum.eth.v1alpha1.LightClientUpdate.header:type_name -> ethereum.eth.v1alpha1.BeaconBlockHeader
+	7,  // 6: ethereum.eth.v1alpha1.LightClientUpdate.next_sync_committee:type_name -> ethereum.eth.v1alpha1.SyncCommittee
+	6,  // 7: ethereum.eth.v1alpha1.LightClientUpdate.finality_header:type_name -> ethereum.eth.v1alpha1.BeaconBlockHeader
+	6,  // 8: ethereum.eth.v1alpha1.SkipSyncUpdate.header:type_name -> ethereum.eth.v1alpha1.BeaconBlockHeader
+	7,  // 9: ethereum.eth.v1alpha1.SkipSyncUpdate.current_sync_committee:type_name -> ethereum.eth.v1alpha1.SyncCommittee
+	7,  // 10: ethereum.eth.v1alpha1.SkipSyncUpdate.next_sync_committee:type_name -> ethereum.eth.v1alpha1.SyncCommittee
+	6,  // 11: ethereum.eth.v1alpha1.SkipSyncUpdate.finality_header:type_name -> ethereum.eth.v1alpha1.BeaconBlockHeader
+	2,  // 12: ethereum.eth.v1alpha1.UpdatesResponse.updates:type_name -> ethereum.eth.v1alpha1.LightClientUpdate
+	8,  // 13: ethereum.eth.v1alpha1.LightClient.GetUpdates:input_type -> google.protobuf.Empty
+	5,  // 14: ethereum.eth.v1alpha1.LightClient.GetSkipSyncUpdate:input_type -> ethereum.eth.v1alpha1.SkipSyncRequest
+	8,  // 15: ethereum.eth.v1alpha1.LightNode.Head:input_type -> google.protobuf.Empty
+	8,  // 16: ethereum.eth.v1alpha1.LightNode.FinalizedHead:input_type -> google.protobuf.Empty
+	4,  // 17: ethereum.eth.v1alpha1.LightClient.GetUpdates:output_type -> ethereum.eth.v1alpha1.UpdatesResponse
+	3,  // 18: ethereum.eth.v1alpha1.LightClient.GetSkipSyncUpdate:output_type -> ethereum.eth.v1alpha1.SkipSyncUpdate
+	6,  // 19: ethereum.eth.v1alpha1.LightNode.Head:output_type -> ethereum.eth.v1alpha1.BeaconBlockHeader
+	6,  // 20: ethereum.eth.v1alpha1.LightNode.FinalizedHead:output_type -> ethereum.eth.v1alpha1.BeaconBlockHeader
+	17, // [17:21] is the sub-list for method output_type
+	13, // [13:17] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_proto_prysm_v1alpha1_light_client_proto_init() }
@@ -653,7 +721,7 @@ func file_proto_prysm_v1alpha1_light_client_proto_init() {
 	file_proto_prysm_v1alpha1_sync_committee_proto_init()
 	if !protoimpl.UnsafeEnabled {
 		file_proto_prysm_v1alpha1_light_client_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ClientSnapshot); i {
+			switch v := v.(*LightClientStore); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -665,7 +733,7 @@ func file_proto_prysm_v1alpha1_light_client_proto_init() {
 			}
 		}
 		file_proto_prysm_v1alpha1_light_client_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*LightClientUpdate); i {
+			switch v := v.(*LightClientSnapshot); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -677,7 +745,7 @@ func file_proto_prysm_v1alpha1_light_client_proto_init() {
 			}
 		}
 		file_proto_prysm_v1alpha1_light_client_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SkipSyncUpdate); i {
+			switch v := v.(*LightClientUpdate); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -689,7 +757,7 @@ func file_proto_prysm_v1alpha1_light_client_proto_init() {
 			}
 		}
 		file_proto_prysm_v1alpha1_light_client_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*UpdatesResponse); i {
+			switch v := v.(*SkipSyncUpdate); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -701,6 +769,18 @@ func file_proto_prysm_v1alpha1_light_client_proto_init() {
 			}
 		}
 		file_proto_prysm_v1alpha1_light_client_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*UpdatesResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_proto_prysm_v1alpha1_light_client_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SkipSyncRequest); i {
 			case 0:
 				return &v.state
@@ -719,7 +799,7 @@ func file_proto_prysm_v1alpha1_light_client_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_proto_prysm_v1alpha1_light_client_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

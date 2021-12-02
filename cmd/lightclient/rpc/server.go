@@ -3,7 +3,7 @@ package rpc
 import (
 	"context"
 	"github.com/golang/protobuf/ptypes/empty"
-	lightsync "github.com/prysmaticlabs/prysm/beacon-chain/node/light/sync"
+	lightsync "github.com/prysmaticlabs/prysm/cmd/lightclient/sync"
 
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	tmplog "log"
