@@ -54,6 +54,15 @@ func verifyNextSyncCommProof(update *ethpb.LightClientUpdate) bool {
 }
 
 // See: https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/sync-protocol.md#validate_light_client_update
+func validateSkipSyncUpdate(
+	snapshot *ethpb.LightClientSnapshot,
+	update *ethpb.LightClientUpdate,
+	genesisValidatorsRoot [32]byte,
+) error {
+	return validateLightClientUpdate(snapshot, update, genesisValidatorsRoot)
+}
+
+// See: https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/sync-protocol.md#validate_light_client_update
 func validateLightClientUpdate(
 	snapshot *ethpb.LightClientSnapshot,
 	update *ethpb.LightClientUpdate,

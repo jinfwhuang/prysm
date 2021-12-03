@@ -103,16 +103,43 @@ func (s *Service) Start() {
 	s.conn = conn
 	s.lightClientServer = ethpb.NewLightClientClient(s.conn)
 
-	s.init(s.ctx)
-	tmplog.Println(s.store)
-	go s.process(s.ctx)
-}
-
-func (s *Service) init(ctx context.Context) {
 	// 1. Recover from a file location if possible
+	s.initStore(ctx)
 
 	// 2. Use hard coded trustedCurrentCommitteeRoot
-	s.skipSync(ctx)
+	s.skipSync(s.ctx)
+	tmplog.Println(s.store)
+
+	// 3. sync
+	go s.sync(s.ctx)
+}
+
+func (s *Service) initStore(ctx context.Context) {
+	skipsyncKey, err := base64.StdEncoding.DecodeString(s.cfg.TrustedCurrentCommitteeRoot)
+	if err != nil {
+		panic(err)
+	}
+	update, err := s.lightClientServer.GetSkipSyncUpdate(ctx, &ethpb.SkipSyncRequest{
+		Key: skipsyncKey,
+	})
+	// TODO: validate update
+	validateSkipSyncUpdate(s.store.Store)
+
+	store := &ethpb.LightClientStore{
+		//Store   *LightClientSnapshot `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
+		//Updates []*LightClientUpdate `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates,omitempty"`
+		//Header               *BeaconBlockHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+		//CurrentSyncCommittee *SyncCommittee     `protobuf:"bytes,2,opt,name=current_sync_committee,json=currentSyncCommittee,proto3" json:"current_sync_committee,omitempty"`
+		//NextSyncCommittee    *SyncCommittee     `protobuf:"bytes,3,opt,name=next_sync_committee,json=nextSyncCommittee,proto3" json:"next_sync_committee,omitempty"`
+
+		Updates: []*ethpb.LightClientUpdate{},
+		Store: &ethpb.LightClientSnapshot{
+			Header:               update.Header,
+			CurrentSyncCommittee: update.CurrentSyncCommittee,
+			NextSyncCommittee:    update.NextSyncCommittee,
+		},
+	}
+	s.store = store
 }
 
 // Skip sync to the point where this client could use the current LightClientUpdates
@@ -156,6 +183,18 @@ func (s *Service) skipSync(ctx context.Context) {
 
 }
 
+func (s *Service) sync(ctx context.Context) {
+
+	count := 0
+	for {
+
+		tmplog.Println("processing", count)
+		time.Sleep(time.Second * 10)
+		count += 1
+	}
+	tmplog.Println("xxx light client sync done processing xxx")
+}
+
 func (s *Service) processSkipSyncUpdate(update *ethpb.SkipSyncUpdate) {
 	lightClientUpdate := &ethpb.LightClientUpdate{
 		Header:                  update.Header,
@@ -173,18 +212,6 @@ func (s *Service) processSkipSyncUpdate(update *ethpb.SkipSyncUpdate) {
 func (s *Service) processLightClientUpdate(update *ethpb.LightClientUpdate) {
 	processLightClientUpdate(s.store, update, s.store.Store.Header.Slot, GenesisValidatorsRoot)
 }
-
-//func (s *Service) process(ctx context.Context) {
-//
-//	count := 0
-//	for {
-//
-//		tmplog.Println("processing", count)
-//		time.Sleep(time.Second * 10)
-//		count += 1
-//	}
-//	tmplog.Println("xxx light client sync done processing xxx")
-//}
 
 // Stop the blockchain service's main event loop and associated goroutines.
 func (s *Service) Stop() error {
