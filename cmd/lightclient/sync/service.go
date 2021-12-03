@@ -12,6 +12,7 @@ import (
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"go.opencensus.io/plugin/ocgrpc"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 	tmplog "log"
 	"sync"
 	"time"
@@ -211,18 +212,29 @@ func (s *Service) skipSync() {
 }
 
 func (s *Service) sync(ctx context.Context) {
-
 	count := 0
 	for {
-		tmplog.Println("processing", count)
-		tmplog.Println("Header", s.store.Snapshot.Header)
-
 		currentSyncRoot, _ := s.store.Snapshot.CurrentSyncCommittee.HashTreeRoot()
 		nextSyncRoot, _ := s.store.Snapshot.NextSyncCommittee.HashTreeRoot()
-		tmplog.Println("current sync-committ", base64.StdEncoding.EncodeToString(currentSyncRoot[:]))
-		tmplog.Println("next sync-committ", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
+		tmplog.Printf("----------%d----------", count)
+		tmplog.Println("header slot      :", s.store.Snapshot.Header.Slot)
+		tmplog.Println("current sync     :", base64.StdEncoding.EncodeToString(currentSyncRoot[:]))
+		tmplog.Println("next sync        :", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
 
-		time.Sleep(time.Second * 10)
+		resp, err := s.lightClientServer.GetUpdates(s.ctx, &emptypb.Empty{})
+		if err != nil {
+			panic(err) // retry instead
+		}
+		update := resp.Updates[0]
+		updateNextSyncRoot, _ := update.NextSyncCommittee.HashTreeRoot()
+		tmplog.Println("update slot      :", update.Header.Slot)
+		tmplog.Println("update next sync :", base64.StdEncoding.EncodeToString(updateNextSyncRoot[:]))
+
+		// TODP: put in processing logic
+		tmplog.Println("start to process the update")
+		s.processLightClientUpdate(update)
+
+		time.Sleep(time.Second * 12) // TODO: use a slot tick instead
 		count += 1
 	}
 	tmplog.Println("xxx light client sync done processing xxx")
@@ -234,9 +246,9 @@ func (s *Service) simpleProcessSkipSyncUpdate(update *ethpb.SkipSyncUpdate) {
 	s.store.Snapshot.NextSyncCommittee = update.NextSyncCommittee
 }
 
-func (s *Service) processSkipSyncUpdate(update *ethpb.SkipSyncUpdate) {
-	s.processLightClientUpdate(toLightClientUpdate(update))
-}
+//func (s *Service) processSkipSyncUpdate(update *ethpb.SkipSyncUpdate) {
+//	s.processLightClientUpdate(toLightClientUpdate(update))
+//}
 
 func (s *Service) processLightClientUpdate(update *ethpb.LightClientUpdate) {
 	processLightClientUpdate(s.store, update, s.store.Snapshot.Header.Slot, GenesisValidatorsRoot)

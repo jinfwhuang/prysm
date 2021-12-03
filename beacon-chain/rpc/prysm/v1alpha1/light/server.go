@@ -35,7 +35,8 @@ func (s *Server) GetUpdates(ctx context.Context, _ *empty.Empty) (*ethpb.Updates
 	}
 
 	updateNextSyncCommRoot, _ := updates[0].NextSyncCommittee.HashTreeRoot()
-	tmplog.Println("update      Next:", base64.StdEncoding.EncodeToString(updateNextSyncCommRoot[:]))
+	tmplog.Printf("GetUpdate, Next:%s", base64.StdEncoding.EncodeToString(updateNextSyncCommRoot[:]))
+	tmplog.Printf("GetUpdate, Slot:%d", updates[0].Header.Slot)
 
 	return &ethpb.UpdatesResponse{Updates: updates}, nil
 }
@@ -48,8 +49,8 @@ func (s *Server) GetSkipSyncUpdate(ctx context.Context, req *ethpb.SkipSyncReque
 
 	currentSynRoot, _ := update.CurrentSyncCommittee.HashTreeRoot()
 	nextSyncRoot, _ := update.NextSyncCommittee.HashTreeRoot()
-	tmplog.Println("skip      Current:", base64.StdEncoding.EncodeToString(currentSynRoot[:]))
-	tmplog.Println("skip         Next:", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
-
+	tmplog.Printf("GetSkip, Current:%s", base64.StdEncoding.EncodeToString(currentSynRoot[:]))
+	tmplog.Printf("GetSkip,    Next:%s", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
+	tmplog.Printf("GetUpdate,  Slot:%d", update.Header.Slot)
 	return update, nil
 }

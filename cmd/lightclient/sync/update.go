@@ -161,15 +161,23 @@ func floorLog2(x uint64) float64 {
 	return math.Floor(math.Log2(float64(x)))
 }
 
-func applyLightClientUpdate(snapshot *ethpb.LightClientSnapshot, update *ethpb.LightClientUpdate) {
+func applyHeaderUpdate(snapshot *ethpb.LightClientSnapshot, header *ethpb.BeaconBlockHeader) {
 	snapshotPeriod := slots.ToEpoch(snapshot.Header.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
-	updatePeriod := slots.ToEpoch(update.Header.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
+	updatePeriod := slots.ToEpoch(header.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
 	if updatePeriod == snapshotPeriod+1 {
 		snapshot.CurrentSyncCommittee = snapshot.NextSyncCommittee
 	} else {
-		snapshot.Header = update.Header
+		snapshot.Header = header
 	}
 }
+
+//func applyUpdateWithUpdateHeader(snapshot *ethpb.LightClientSnapshot, update *ethpb.LightClientUpdate) {
+//	applyHeaderUpdate(snapshot, update.Header)
+//}
+//
+//func applyUpdateWithFinalityHeader(snapshot *ethpb.LightClientSnapshot, update *ethpb.LightClientUpdate) {
+//	applyHeaderUpdate(snapshot, update.FinalityHeader)
+//}
 
 /**
 def process_light_client_update(store: LightClientStore, update: LightClientUpdate, current_slot: Slot,
@@ -181,38 +189,34 @@ func processLightClientUpdate(
 	currentSlot eth2_types.Slot,
 	genesisValidatorsRoot [32]byte,
 ) error {
-	//store := s.store
-	//currentSlot := s.store.Store.Header.Slot
-
-	if err := validateLightClientUpdate(store.Snapshot, update, genesisValidatorsRoot); err != nil {
-		return err
-	}
-
 	store.Updates = append(store.Updates, update)
 	updateTimeout := uint64(params.BeaconConfig().SlotsPerEpoch) * uint64(params.BeaconConfig().EpochsPerSyncCommitteePeriod)
 	sumParticipantBits := update.SyncCommitteeBits.Count()
-	hasQuorum := sumParticipantBits*3 >= uint64(len(update.SyncCommitteeBits))*2 // TODO
-	if hasQuorum && !isEmptyBlockHeader(update.FinalityHeader) {
-		// Apply update if (1) 2/3 quorum is reached and (2) we have a finality proof.
-		// Note that (2) means that the current light client design needs finality.
-		// It may be changed to re-organizable light client design. See the on-going issue consensus-specs#2182.
-		applyLightClientUpdate(store.Snapshot, update)
+	quorumTwoThird := sumParticipantBits >= update.SyncCommitteeBits.Len()*2.0/3 // 2/3 quorum is reached
+	if quorumTwoThird && !isEmptyBlockHeader(update.FinalityHeader) {
+		// Only use a finality header
+		applyHeaderUpdate(store.Snapshot, update.FinalityHeader) // TODO: There could be a different update algorithm
+
+		// Blindly accepts the latest header
+		applyHeaderUpdate(store.Snapshot, update.Header) // TODO: There could be a different update algorithm
 		store.Updates = make([]*ethpb.LightClientUpdate, 0)
 	} else if currentSlot > store.Snapshot.Header.Slot.Add(updateTimeout) {
-		// Forced best update when the update timeout has elapsed
-		//// Use the update that has the highest sum of sync committee bits.
-		//updateWithHighestSumBits := store.Updates[0]
-		//highestSumBitsUpdate := updateWithHighestSumBits.SyncCommitteeBits.Count()
-		//for _, validUpdate := range store.Updates {
-		//	sumUpdateBits := validUpdate.SyncCommitteeBits.Count()
-		//	if sumUpdateBits > highestSumBitsUpdate {
-		//		highestSumBitsUpdate = sumUpdateBits
-		//		updateWithHighestSumBits = validUpdate
-		//	}
-		//}
-		bestUpdate := store.Updates[0] // TODO: hack
-		applyLightClientUpdate(store.Snapshot, bestUpdate)
-		store.Updates = make([]*ethpb.LightClientUpdate, 0)
+		// TODO: use skip-sync
+		panic("Not implemented")
+		//// Forced best update when the update timeout has elapsed
+		////// Use the update that has the highest sum of sync committee bits.
+		////updateWithHighestSumBits := store.Updates[0]
+		////highestSumBitsUpdate := updateWithHighestSumBits.SyncCommitteeBits.Count()
+		////for _, validUpdate := range store.Updates {
+		////	sumUpdateBits := validUpdate.SyncCommitteeBits.Count()
+		////	if sumUpdateBits > highestSumBitsUpdate {
+		////		highestSumBitsUpdate = sumUpdateBits
+		////		updateWithHighestSumBits = validUpdate
+		////	}
+		////}
+		//bestUpdate := store.Updates[0] // TODO: hack
+		//applyLightClientUpdate(store.Snapshot, bestUpdate)
+		//store.Updates = make([]*ethpb.LightClientUpdate, 0)
 	}
 	return nil
 }
