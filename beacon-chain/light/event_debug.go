@@ -2,7 +2,9 @@ package light
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
+	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
 	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
 
 	//vv1 "github.com/prysmaticlabs/prysm/beacon-chain/state/v1"
@@ -68,6 +70,54 @@ func saveSsz(block block.BeaconBlock, ztypeState *ztype.ZtypBeaconStateAltair, f
 	stateRoot := ztypeState.HashTreeRoot()
 	filename := "./tmp/ssz/keep/beacon-state/" + hexStr(stateRoot[:]) + ".ssz"
 	writetofile(filename, stateRoot, bytearray)
+}
+
+func verifyMerkleFinalityHeader(update *ethpb.LightClientUpdate) bool {
+	gIndex := ztype.CalculateGIndex(ztype.BeaconStateAltairType, 20, 1) // next_sync_committee  23
+	root := update.Header.StateRoot
+	leaf, err := update.FinalityHeader.HashTreeRoot() // ??? Is this hashroot correct? fastszz issue?  TODO: jin
+	if err != nil {
+		tmplog.Println(err)
+		panic(err)
+	}
+	branch := update.FinalityBranch
+	return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
+}
+
+func verifyMerkleNextSyncComm(update *ethpb.LightClientUpdate) bool {
+	gIndex := ztype.CalculateGIndex(ztype.BeaconStateAltairType, 23) // next_sync_committee  23
+	root := update.Header.StateRoot
+	leaf, err := update.NextSyncCommittee.HashTreeRoot() // ??? Is this hashroot correct? fastszz issue?  TODO: jin
+
+	if err != nil {
+		tmplog.Println(err)
+		panic(err)
+	}
+	branch := update.NextSyncCommitteeBranch
+	return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
+}
+
+func testVerification(update *ethpb.LightClientUpdate, ztypeState ztype.ZtypBeaconStateAltair) {
+	// Testing a verification
+	ver := verifyMerkleFinalityHeader(update)
+	tmplog.Println("ver", ver)
+
+	gIndex := ztype.CalculateGIndex(ztype.BeaconStateAltairType, 20, 1) // next_sync_committee  23
+
+	root1 := bytesutil.ToBytes32(update.FinalityHeader.StateRoot)
+	leaf1, _ := update.FinalityHeader.HashTreeRoot() // ??? Is this hashroot correct? fastszz issue?  TODO: jin
+	tmplog.Println("using update", ztype.Verify(root1, gIndex, leaf1, update.NextSyncCommitteeBranch))
+
+	root2 := ztypeState.HashTreeRoot()
+	leaf2, _ := update.FinalityHeader.HashTreeRoot() // ??? Is this hashroot correct? fastszz issue?  TODO: jin
+	tmplog.Println("second try", ztype.Verify(root2, gIndex, leaf2, update.FinalityBranch))
+
+	tmplog.Println("root1", base64.StdEncoding.EncodeToString(root1[:]))
+	tmplog.Println("root2", base64.StdEncoding.EncodeToString(root2[:]))
+	tmplog.Println("leaf1", base64.StdEncoding.EncodeToString(leaf1[:]))
+	tmplog.Println("leaf2", base64.StdEncoding.EncodeToString(leaf2[:]))
+	tmplog.Println("leaf2", base64.StdEncoding.EncodeToString(ztypeState.State.FinalizedCheckpoint().Root))
+
 }
 
 //func saveSsz(ctx context.Context, state ) {
@@ -137,4 +187,26 @@ func mkBeaconStateAltair(bytearray []byte) state.BeaconState {
 // TODO: hack
 func hex0x(b []byte) string {
 	return "0x" + hex.EncodeToString(b[:])
+}
+
+func testVerifyNexSynComm(update *ethpb.LightClientUpdate, ztypeState ztype.ZtypBeaconStateAltair) {
+	gIndex := ztype.CalculateGIndex(ztype.BeaconStateAltairType, 23) // next_sync_committee  23
+
+	// Testing a verification
+	ver := verifyMerkleNextSyncComm(update)
+	tmplog.Println("ver", ver)
+
+	root1 := bytesutil.ToBytes32(update.Header.StateRoot)
+	leaf1, _ := update.NextSyncCommittee.HashTreeRoot() // ??? Is this hashroot correct? fastszz issue?  TODO: jin
+	tmplog.Println("using update", ztype.Verify(root1, gIndex, leaf1, update.NextSyncCommitteeBranch))
+
+	root2 := ztypeState.HashTreeRoot()
+	leaf2 := ztypeState.GetLeaf(gIndex)
+	tmplog.Println("second try", ztype.Verify(root2, gIndex, leaf2, update.NextSyncCommitteeBranch))
+
+	tmplog.Println("root1", base64.StdEncoding.EncodeToString(root1[:]))
+	tmplog.Println("root2", base64.StdEncoding.EncodeToString(root2[:]))
+	tmplog.Println("leaf1", base64.StdEncoding.EncodeToString(leaf1[:]))
+	tmplog.Println("leaf2", base64.StdEncoding.EncodeToString(leaf2[:]))
+
 }

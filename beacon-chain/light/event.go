@@ -2,6 +2,7 @@ package light
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/feed"
@@ -98,6 +99,11 @@ func (s *Service) maintainQueueLightClientUpdates(ctx context.Context, block blo
 	if err != nil {
 		return err
 	}
+	//finalityState, err := s.cfg.Database.State(ctx, bytesutil.ToBytes32(fCheckpoint.Root))
+	//if err != nil {
+	//	return err
+	//}
+	//ztypeFinalityState := ztype.FromBeaconState(finalityState.(*statev2.BeaconState))
 	finalityCheckpointRootBranch := ztypeState.GetBranch(ztypeState.GetGIndex(20, 1))
 
 	syncAgg, err := block.Block().Body().SyncAggregate()
@@ -143,6 +149,14 @@ func (s *Service) maintainQueueLightClientUpdates(ctx context.Context, block blo
 	s.cfg.Database.SaveSkipSyncUpdate(ctx, skipSyncUpdate)
 
 	//saveSsz(block.Block(), ztypeState, finalityBlock.Block())
+
+	skipSyncCurrentSyncCommRoot, err := skipSyncUpdate.CurrentSyncCommittee.HashTreeRoot()
+	skipSyncNextSyncCommRoot, err := skipSyncUpdate.NextSyncCommittee.HashTreeRoot()
+	updatecNextSyncCommRoot, err := update.NextSyncCommittee.HashTreeRoot()
+
+	tmplog.Println("skip     Current:", base64.StdEncoding.EncodeToString(skipSyncCurrentSyncCommRoot[:]))
+	tmplog.Println("skip        Next:", base64.StdEncoding.EncodeToString(skipSyncNextSyncCommRoot[:]))
+	tmplog.Println("update      Next:", base64.StdEncoding.EncodeToString(updatecNextSyncCommRoot[:]))
 
 	return nil
 }

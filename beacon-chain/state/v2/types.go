@@ -53,6 +53,10 @@ func (b *BeaconState) GetState() *ethpb.BeaconStateAltair {
 	return b.state
 }
 
+func (b *BeaconState) SetState(state *ethpb.BeaconStateAltair) {
+	b.state = state
+}
+
 //func (b *BeaconState) GetState() *ethpb.BeaconStateAltair {
 //	return b.state
 //}

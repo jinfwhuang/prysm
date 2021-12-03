@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"encoding/base64"
 	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
 	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
 	tmplog "log"
@@ -19,16 +18,17 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const GenesisValidatorsRootBase64Str = "SzY9uU4oYSDXbrkFNA/dTlS/6fBr8z/2z1rSf1Eb/pU="
-
-var GenesisValidatorsRoot [32]byte
-
-func init() {
-	b, err := base64.StdEncoding.DecodeString(GenesisValidatorsRootBase64Str)
-	if err != nil {
-		panic(err)
+func toLightClientUpdate(update *ethpb.SkipSyncUpdate) *ethpb.LightClientUpdate {
+	return &ethpb.LightClientUpdate{
+		Header:                  update.Header,
+		NextSyncCommittee:       update.NextSyncCommittee,
+		NextSyncCommitteeBranch: update.NextSyncCommitteeBranch,
+		FinalityHeader:          update.FinalityHeader,
+		FinalityBranch:          update.FinalityBranch,
+		SyncCommitteeBits:       update.SyncCommitteeBits,
+		SyncCommitteeSignature:  update.SyncCommitteeSignature,
+		ForkVersion:             update.ForkVersion,
 	}
-	GenesisValidatorsRoot = bytesutil.ToBytes32(b)
 }
 
 // TODO: refactor
@@ -51,15 +51,6 @@ func verifyFinalityBranch(update *ethpb.LightClientUpdate) bool {
 // TODO: ??
 func verifyNextSyncCommProof(update *ethpb.LightClientUpdate) bool {
 	return true
-}
-
-// See: https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/sync-protocol.md#validate_light_client_update
-func validateSkipSyncUpdate(
-	snapshot *ethpb.LightClientSnapshot,
-	update *ethpb.LightClientUpdate,
-	genesisValidatorsRoot [32]byte,
-) error {
-	return validateLightClientUpdate(snapshot, update, genesisValidatorsRoot)
 }
 
 // See: https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/sync-protocol.md#validate_light_client_update
@@ -193,7 +184,7 @@ func processLightClientUpdate(
 	//store := s.store
 	//currentSlot := s.store.Store.Header.Slot
 
-	if err := validateLightClientUpdate(store.Store, update, genesisValidatorsRoot); err != nil {
+	if err := validateLightClientUpdate(store.Snapshot, update, genesisValidatorsRoot); err != nil {
 		return err
 	}
 
@@ -205,9 +196,9 @@ func processLightClientUpdate(
 		// Apply update if (1) 2/3 quorum is reached and (2) we have a finality proof.
 		// Note that (2) means that the current light client design needs finality.
 		// It may be changed to re-organizable light client design. See the on-going issue consensus-specs#2182.
-		applyLightClientUpdate(store.Store, update)
+		applyLightClientUpdate(store.Snapshot, update)
 		store.Updates = make([]*ethpb.LightClientUpdate, 0)
-	} else if currentSlot > store.Store.Header.Slot.Add(updateTimeout) {
+	} else if currentSlot > store.Snapshot.Header.Slot.Add(updateTimeout) {
 		// Forced best update when the update timeout has elapsed
 		//// Use the update that has the highest sum of sync committee bits.
 		//updateWithHighestSumBits := store.Updates[0]
@@ -220,7 +211,7 @@ func processLightClientUpdate(
 		//	}
 		//}
 		bestUpdate := store.Updates[0] // TODO: hack
-		applyLightClientUpdate(store.Store, bestUpdate)
+		applyLightClientUpdate(store.Snapshot, bestUpdate)
 		store.Updates = make([]*ethpb.LightClientUpdate, 0)
 	}
 	return nil

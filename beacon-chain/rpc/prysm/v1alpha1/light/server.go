@@ -2,6 +2,7 @@ package light
 
 import (
 	"context"
+	"encoding/base64"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/prysmaticlabs/prysm/beacon-chain/light"
 	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
@@ -32,6 +33,10 @@ func (s *Server) GetUpdates(ctx context.Context, _ *empty.Empty) (*ethpb.Updates
 	for i := 0; i < size; i++ {
 		updates[i] = _updates[i].(*ethpb.LightClientUpdate)
 	}
+
+	updateNextSyncCommRoot, _ := updates[0].NextSyncCommittee.HashTreeRoot()
+	tmplog.Println("update      Next:", base64.StdEncoding.EncodeToString(updateNextSyncCommRoot[:]))
+
 	return &ethpb.UpdatesResponse{Updates: updates}, nil
 }
 
@@ -40,6 +45,11 @@ func (s *Server) GetSkipSyncUpdate(ctx context.Context, req *ethpb.SkipSyncReque
 	if err != nil {
 		return nil, err
 	}
+
+	currentSynRoot, _ := update.CurrentSyncCommittee.HashTreeRoot()
+	nextSyncRoot, _ := update.NextSyncCommittee.HashTreeRoot()
+	tmplog.Println("skip      Current:", base64.StdEncoding.EncodeToString(currentSynRoot[:]))
+	tmplog.Println("skip         Next:", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
 
 	return update, nil
 }

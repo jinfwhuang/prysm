@@ -47,8 +47,8 @@ func Test_NextSyncCommitteeBranch(t *testing.T) {
 	require.NoError(t, err)
 	state := ztype.FromSszBytes(sszbytes)
 
-	root := state.HashTreeRoot()
 	gIndex := state.GetGIndex(23)
+	root := state.HashTreeRoot()
 	leaf := state.GetLeaf(gIndex)
 	nextSyncCommitteeBranch := state.GetBranch(gIndex)
 
@@ -151,6 +151,5 @@ func Test_NumOfSetBits(t *testing.T) {
 
 	bitField := syncAgg.SyncCommitteeBits
 
-	NumOfSetBits(bitField)
-
+	numOfSetBits(bitField)
 }

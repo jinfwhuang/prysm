@@ -97,6 +97,32 @@ var (
 //	Verify(leave tree.Root, branch [][]byte, index tree.Gindex64, root tree.Root) bool
 //}
 
+func CalculateGIndex(def *view.ContainerTypeDef, fieldIndices ...uint64) tree.Gindex64 {
+	var gindices []tree.Gindex64
+	for _, fieldIndex := range fieldIndices {
+		//tmplog.Println(def)
+		depth := tree.CoverDepth(def.FieldCount())
+		gIndex, err := tree.ToGindex64(fieldIndex, depth)
+		PanicErr(err)
+		gindices = append(gindices, gIndex)
+
+		field := def.Fields[fieldIndex]
+		if len(gindices) == len(fieldIndices) {
+			// This allows the last field index to refer to a field that is not ContainerType
+			break
+		}
+
+		switch v := field.Type.(type) {
+		case *view.ContainerTypeDef:
+			def = v
+		default:
+			tmplog.Println(field)
+			panic("the field is not a containertype")
+		}
+	}
+	return ConcatGeneralizedIndices(gindices...)
+}
+
 type ZtypBeaconStateAltair struct {
 	//def  view.ContainerTypeDef
 	View  *view.ContainerView
@@ -105,6 +131,7 @@ type ZtypBeaconStateAltair struct {
 
 func NewEmptyBeaconState() *ZtypBeaconStateAltair {
 	v2State := &stateV2.BeaconState{}
+	v2State.SetState(&ethpb.BeaconStateAltair{})
 	return FromBeaconState(v2State)
 }
 
@@ -156,30 +183,7 @@ func FromBeaconState(state *stateV2.BeaconState) *ZtypBeaconStateAltair {
 
 // GetGIndex Get the generalized index of the field
 func (s *ZtypBeaconStateAltair) GetGIndex(fieldIndices ...uint64) tree.Gindex64 {
-	var gindices []tree.Gindex64
-	def := s.View.ContainerTypeDef // TODO: hack, assuming that all the objects in the path is ContainerTypeDef
-	for _, fieldIndex := range fieldIndices {
-		//tmplog.Println(def)
-		depth := tree.CoverDepth(def.FieldCount())
-		gIndex, err := tree.ToGindex64(fieldIndex, depth)
-		PanicErr(err)
-		gindices = append(gindices, gIndex)
-
-		field := def.Fields[fieldIndex]
-		if len(gindices) == len(fieldIndices) {
-			// This allows the last field index to refer to a field that is not ContainerType
-			break
-		}
-
-		switch v := field.Type.(type) {
-		case *view.ContainerTypeDef:
-			def = v
-		default:
-			tmplog.Println(field)
-			panic("the field is not a containertype")
-		}
-	}
-	return ConcatGeneralizedIndices(gindices...)
+	return CalculateGIndex(s.View.ContainerTypeDef, fieldIndices...)
 }
 
 func (s *ZtypBeaconStateAltair) HashTreeRoot() tree.Root {

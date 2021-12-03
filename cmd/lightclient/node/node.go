@@ -21,6 +21,19 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+//const TrustedCurrentCommitteeRoot = "rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8="
+const TrustedCurrentCommitteeRoot = "UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M="
+
+/**
+skip      Current: UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=
+skip         Next: rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=
+
+skip     Current: rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=
+skip        Next: rR02jjGZACSvzADI9boK4qXf8Aa4YGhMsdM4Jk6cs0c=
+
+update      Next: rR02jjGZACSvzADI9boK4qXf8Aa4YGhMsdM4Jk6cs0c=
+*/
+
 type LightNode struct {
 	cliCtx   *cli.Context
 	ctx      context.Context
@@ -91,7 +104,7 @@ func (ln *LightNode) registerSyncService() error {
 	// TODO: Link the configuration variables with flags
 
 	svc, err := lightsync.NewService(ln.ctx, &lightsync.Config{
-		TrustedCurrentCommitteeRoot: "UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=",
+		TrustedCurrentCommitteeRoot: TrustedCurrentCommitteeRoot,
 		GrpcRetryDelay:              time.Second * 5,
 		GrpcRetries:                 5,
 		MaxCallRecvMsgSize:          1 << 22,
