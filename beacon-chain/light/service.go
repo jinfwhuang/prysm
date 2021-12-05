@@ -71,6 +71,14 @@ func (s *Service) GetSkipSyncUpdate(ctx context.Context, key [32]byte) (*ethpb.S
 	return s.cfg.Database.GetSkipSyncUpdate(ctx, key)
 }
 
+func (s *Service) GetCurrentSyncComm(ctx context.Context) (*ethpb.SyncCommittee, error) {
+	_, state, err := s.GetChainHeadAndState(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return state.CurrentSyncCommittee()
+}
+
 func (s *Service) run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancelFunc = cancel

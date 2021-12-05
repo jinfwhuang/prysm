@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	//lightnode "github.com/prysmaticlabs/prysm/cmd/lightclient/node"
+	lightclientdebug "github.com/prysmaticlabs/prysm/cmd/lightclient/debug"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"go.opencensus.io/plugin/ocgrpc"
 	"google.golang.org/grpc"
@@ -156,19 +157,15 @@ func (s *Service) initStore() {
 	if err != nil {
 		panic(err)
 	}
-	update, err := s.lightClientServer.GetSkipSyncUpdate(s.ctx, &ethpb.SkipSyncRequest{
-		Key: key,
-	})
+	update, err := s.lookupSkipSync(key)
 	if err != nil {
-		tmplog.Printf("check if %s is available", s.cfg.FullNodeServerEndpoint)
-		panic(err) // TODO: should retry
+		panic("cannot initialize")
 	}
 
 	// Validate
 	err = validateMerkleSkipSyncUpdate(update)
 	if err != nil {
 		panic(err) // TODO: retry another skip-sync-update
-
 	}
 	// Initialize a Store
 	store := &ethpb.LightClientStore{
@@ -215,10 +212,10 @@ func (s *Service) skipSync() {
 		if err != nil {
 			panic(err)
 		}
-		skipSyncUpdate, err := s.lightClientServer.GetSkipSyncUpdate(s.ctx, &ethpb.SkipSyncRequest{
-			Key: skipSyncKey[:],
-		})
+		skipSyncUpdate, err := s.lookupSkipSync(skipSyncKey[:])
 		if err != nil && strings.Contains(err.Error(), "cannot find skip sync error") {
+			tmplog.Println(err)
+			tmplog.Println("keep trying to find the same skip-sync object; we might be running a infinite loop")
 			continue // TODO: This could go on infinite loop or a really long loop
 		} else if err != nil {
 			panic(err)
@@ -373,4 +370,26 @@ func SnapshotToString(snapshot *ethpb.LightClientSnapshot) string {
 	s := fmt.Sprintf("header=%s|current-sync=%s|next-sync=%s", headerStr, currentSyncCommRoot, nextSyncCommRoot)
 
 	return s
+}
+
+// TODO: hacky
+func (s *Service) lookupSkipSync(key []byte) (*ethpb.SkipSyncUpdate, error) {
+	update, err := s.lightClientServer.GetSkipSyncUpdate(s.ctx, &ethpb.SkipSyncRequest{
+		Key: key,
+	})
+	if err != nil && strings.Contains(err.Error(), "cannot find skip sync error") {
+		recommendedKeyStr := lightclientdebug.GetTrustedCurrentCommitteeRoot()
+		keyStr := base64.StdEncoding.EncodeToString(key)
+
+		errMsg := fmt.Sprintf("cannot find skip sync error; requesting key=%s", keyStr)
+		tmplog.Printf(errMsg)
+		tmplog.Printf("The backing beacon-node, %s, does not have the requested ski-sync-update", s.cfg.FullNodeServerEndpoint)
+		tmplog.Printf("Consider starting the lightnode with: --trusted-current-committee-root='%s'", recommendedKeyStr)
+		return nil, fmt.Errorf(errMsg)
+	} else if err != nil {
+		tmplog.Printf("check if address %s is available", s.cfg.FullNodeServerEndpoint)
+		panic(err) // TODO: Consider retry
+	}
+
+	return update, nil
 }

@@ -9,20 +9,6 @@ import (
 	tmplog "log"
 )
 
-func main2() {
-	//server1 := service.NewBeaconChainClient(conn)
-	//
-	//headers, err := server1.ListBlockHeaders(ctx, &v1.BlockHeadersRequest{})
-	//if err != nil {
-	//	panic(err)
-	//}
-	//data := headers.Data[0]
-	//stateRoot := data.Header.Message.StateRoot
-	//
-	//server2 := ethpb.NewBeaconChainClient(conn)
-	//server2.GetChainHead()
-}
-
 func main() {
 	ctx := context.Background()
 	dialOpts := []grpc.DialOption{

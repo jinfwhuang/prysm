@@ -23,6 +23,14 @@ go run -v ./cmd/lightclient/ \
 # UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=  // roughly 2021-12-02
 # rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=  // roughly 2021-12-03
 
+# Start with fault trusted-root
+go run -v ./cmd/lightclient/ \
+--full-node-server-endpoint=127.0.0.1:4000 \
+--grpc-port=4001 \
+--data-dir=../prysm-data/lightnode \
+--sync-mode=latest \
+--trusted-current-committee-root='aaaaaaE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8='
+
 ```
 
 ## Big TODOs

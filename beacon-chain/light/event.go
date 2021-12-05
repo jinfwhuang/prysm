@@ -26,7 +26,7 @@ const (
 	nextSyncCommitteeStateIndex   = 23
 )
 
-func (s *Service) getChainHeadAndState(ctx context.Context) (block.SignedBeaconBlock, state.BeaconState, error) {
+func (s *Service) GetChainHeadAndState(ctx context.Context) (block.SignedBeaconBlock, state.BeaconState, error) {
 	head, err := s.cfg.HeadFetcher.HeadBlock(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -52,7 +52,7 @@ func (s *Service) subscribeHeadEvent(ctx context.Context) {
 		select {
 		case ev := <-stateChan:
 			if ev.Type == statefeed.NewHead {
-				head, beaconState, err := s.getChainHeadAndState(ctx)
+				head, beaconState, err := s.GetChainHeadAndState(ctx)
 				if err != nil {
 					log.Error(err)
 					continue

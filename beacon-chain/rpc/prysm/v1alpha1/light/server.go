@@ -56,10 +56,8 @@ func (s *Server) GetSkipSyncUpdate(ctx context.Context, req *ethpb.SkipSyncReque
 }
 
 func (s *Server) DebugGetTrustedCurrentCommitteeRoot(ctx context.Context, empty *empty.Empty) (*ethpb.DebugGetTrustedCurrentCommitteeRootResp, error) {
-	q := s.LightClientService.Queue
-	updates := q.Peek(1)
-	update := updates[0].(*ethpb.LightClientUpdate)
-	root, err := update.NextSyncCommittee.HashTreeRoot()
+	syncComm, err := s.LightClientService.GetCurrentSyncComm(ctx)
+	root, err := syncComm.HashTreeRoot()
 	if err != nil {
 		return nil, err
 	}
