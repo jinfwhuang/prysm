@@ -55,15 +55,16 @@ func (s *Server) GetSkipSyncUpdate(ctx context.Context, req *ethpb.SkipSyncReque
 	return update, nil
 }
 
-func (s *Server) DebugGetTrustedCurrentCommitteeRoot(ctx context.Context, empty *empty.Empty) (*ethpb.SkipSyncUpdate, error) {
+func (s *Server) DebugGetTrustedCurrentCommitteeRoot(ctx context.Context, empty *empty.Empty) (*ethpb.DebugGetTrustedCurrentCommitteeRootResp, error) {
 	q := s.LightClientService.Queue
 	updates := q.Peek(1)
+	update := updates[0].(*ethpb.LightClientUpdate)
+	root, err := update.NextSyncCommittee.HashTreeRoot()
+	if err != nil {
+		return nil, err
+	}
 
-	// Generate proto and put this
+	return &ethpb.DebugGetTrustedCurrentCommitteeRootResp{
+		Key: root[:],
+	}, nil
 }
-
-//rpc DebugGetTrustedCurrentCommitteeRoot(google.protobuf.Empty) returns (DebugGetTrustedCurrentCommitteeRootResp) {
-//option (google.api.http) = {
-//get: "/eth/v1alpha1/light-client/debug-get-trusted-sync-comm-root",
-//};
-//}
