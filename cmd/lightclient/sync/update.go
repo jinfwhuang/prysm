@@ -1,16 +1,14 @@
 package sync
 
 import (
-	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
-	tmplog "log"
-	"math"
-
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/signing"
 	"github.com/prysmaticlabs/prysm/config/params"
 	"github.com/prysmaticlabs/prysm/crypto/bls/blst"
 	"github.com/prysmaticlabs/prysm/crypto/bls/common"
+	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
+	tmplog "log"
 	//v1alpha1 "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	eth2_types "github.com/prysmaticlabs/eth2-types"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
@@ -19,6 +17,7 @@ import (
 )
 
 func toLightClientUpdate(update *ethpb.SkipSyncUpdate) *ethpb.LightClientUpdate {
+	tmplog.Println(update)
 	return &ethpb.LightClientUpdate{
 		Header:                  update.Header,
 		NextSyncCommittee:       update.NextSyncCommittee,
@@ -33,8 +32,6 @@ func toLightClientUpdate(update *ethpb.SkipSyncUpdate) *ethpb.LightClientUpdate 
 
 // TODO: refactor
 func verifyFinalityBranch(update *ethpb.LightClientUpdate) bool {
-
-	//root tree.Root, gIndex tree.Gindex64, leaf tree.Root, branch [][]byte
 	emptyZtypeState := ztype.NewEmptyBeaconState()
 
 	root := update.FinalityHeader.StateRoot
@@ -153,14 +150,6 @@ func isEmptyBlockHeader(header *ethpb.BeaconBlockHeader) bool {
 	})
 }
 
-func getSubtreeIndex(index uint64) uint64 {
-	return index % uint64(math.Pow(2, floorLog2(index)))
-}
-
-func floorLog2(x uint64) float64 {
-	return math.Floor(math.Log2(float64(x)))
-}
-
 func applyHeaderUpdate(snapshot *ethpb.LightClientSnapshot, header *ethpb.BeaconBlockHeader) {
 	snapshotPeriod := slots.ToEpoch(snapshot.Header.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
 	updatePeriod := slots.ToEpoch(header.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
@@ -171,16 +160,8 @@ func applyHeaderUpdate(snapshot *ethpb.LightClientSnapshot, header *ethpb.Beacon
 	}
 }
 
-//func applyUpdateWithUpdateHeader(snapshot *ethpb.LightClientSnapshot, update *ethpb.LightClientUpdate) {
-//	applyHeaderUpdate(snapshot, update.Header)
-//}
-//
-//func applyUpdateWithFinalityHeader(snapshot *ethpb.LightClientSnapshot, update *ethpb.LightClientUpdate) {
-//	applyHeaderUpdate(snapshot, update.FinalityHeader)
-//}
-
 /**
-def process_light_client_update(store: LightClientStore, update: LightClientUpdate, current_slot: Slot,
+def process_light_client_update(Store: LightClientStore, update: LightClientUpdate, current_slot: Slot,
                                 genesis_validators_root: Root) -> None:
 */
 func processLightClientUpdate(
@@ -205,18 +186,18 @@ func processLightClientUpdate(
 		panic("Not implemented")
 		//// Forced best update when the update timeout has elapsed
 		////// Use the update that has the highest sum of sync committee bits.
-		////updateWithHighestSumBits := store.Updates[0]
+		////updateWithHighestSumBits := Store.Updates[0]
 		////highestSumBitsUpdate := updateWithHighestSumBits.SyncCommitteeBits.Count()
-		////for _, validUpdate := range store.Updates {
+		////for _, validUpdate := range Store.Updates {
 		////	sumUpdateBits := validUpdate.SyncCommitteeBits.Count()
 		////	if sumUpdateBits > highestSumBitsUpdate {
 		////		highestSumBitsUpdate = sumUpdateBits
 		////		updateWithHighestSumBits = validUpdate
 		////	}
 		////}
-		//bestUpdate := store.Updates[0] // TODO: hack
-		//applyLightClientUpdate(store.Snapshot, bestUpdate)
-		//store.Updates = make([]*ethpb.LightClientUpdate, 0)
+		//bestUpdate := Store.Updates[0] // TODO: hack
+		//applyLightClientUpdate(Store.Snapshot, bestUpdate)
+		//Store.Updates = make([]*ethpb.LightClientUpdate, 0)
 	}
 	return nil
 }

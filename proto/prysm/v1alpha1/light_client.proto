@@ -151,6 +151,11 @@ service LightClient {
       get: "/eth/v1alpha1/light-client/skip-sync",
     };
   }
+  rpc DebugGetTrustedCurrentCommitteeRoot(google.protobuf.Empty) returns (DebugGetTrustedCurrentCommitteeRootResp) {
+    option (google.api.http) = {
+      get: "/eth/v1alpha1/light-client/debug-get-trusted-sync-comm-root",
+    };
+  }
 }
 
 message UpdatesResponse {
@@ -158,6 +163,11 @@ message UpdatesResponse {
 }
 
 message SkipSyncRequest {
+  // Merkle root of a SyncCommittee, the current sync committee
+  bytes key = 1 [(ethereum.eth.ext.ssz_size) = "32"];
+}
+
+message DebugGetTrustedCurrentCommitteeRootResp {
   // Merkle root of a SyncCommittee, the current sync committee
   bytes key = 1 [(ethereum.eth.ext.ssz_size) = "32"];
 }
@@ -200,5 +210,4 @@ service LightNode {
       get: "/internal/eth/v1/beacon/finalized-head"
     };
   }
-
 }

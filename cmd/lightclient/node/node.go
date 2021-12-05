@@ -2,10 +2,7 @@ package node
 
 import (
 	"context"
-	"github.com/prysmaticlabs/prysm/cmd"
-	"github.com/prysmaticlabs/prysm/cmd/beacon-chain/flags"
 	lightutil "github.com/prysmaticlabs/prysm/cmd/lightclient/util"
-
 	//"github.com/prysmaticlabs/prysm/cmd/lightclient"
 	lightrpc "github.com/prysmaticlabs/prysm/cmd/lightclient/rpc"
 	lightsync "github.com/prysmaticlabs/prysm/cmd/lightclient/sync"
@@ -21,9 +18,6 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-//const TrustedCurrentCommitteeRoot = "rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8="
-const TrustedCurrentCommitteeRoot = "UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M="
-
 /**
 skip      Current: UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=
 skip         Next: rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=
@@ -32,7 +26,75 @@ skip     Current: rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=
 skip        Next: rR02jjGZACSvzADI9boK4qXf8Aa4YGhMsdM4Jk6cs0c=
 
 update      Next: rR02jjGZACSvzADI9boK4qXf8Aa4YGhMsdM4Jk6cs0c=
+
+
+--full-node-server-endpoint=127.0.0.1:4000 \
+--grpc-port=4001 \
+--grpc-gateway-port=3501 \
+--datadir=../prysm-data/lightnode/ \
+--sync-mode=quorum \
 */
+
+var (
+	FullNodeServerEndpoint = &cli.StringFlag{
+		Name:  "full-node-server-endpoint",
+		Usage: "xxx",
+		Value: "localhost:4000",
+	}
+	SyncModeStr = &cli.StringFlag{
+		Name:  "sync-mode",
+		Usage: "xxx",
+		Value: "latest",
+	}
+	DataDir = &cli.StringFlag{
+		Name:  "data-dir",
+		Usage: "xxx",
+		Value: "../prysm-data/lightnode/",
+	}
+	GrpcPort = &cli.IntFlag{
+		Name:  "grpc-port",
+		Usage: "xxx",
+		Value: 4001,
+	}
+	GrpcGatewayPort = &cli.IntFlag{
+		Name:  "grpc-gateway-port",
+		Usage: "xxx",
+		Value: 3500,
+	}
+	GrpcMaxCallRecvMsgSize = &cli.IntFlag{
+		Name:  "grpc-max-msg-size",
+		Usage: "Integer to define max recieve message call size (default: 4194304 (for 4MB))",
+		Value: 1 << 22, // 2^22, ~4.2MB
+	}
+	GrpcRetryDelay = &cli.IntFlag{
+		Name:  "grpc-retry-delay",
+		Usage: "In seconds",
+		Value: 1, // TODO: very fast
+	}
+	GrpcRetries = &cli.IntFlag{
+		Name:  "grpc-retries",
+		Usage: "xxx",
+		Value: 3,
+	}
+	TrustedCurrentCommitteeRoot = &cli.StringFlag{
+		Name:  "trusted-current-committee-root",
+		Usage: "In base64 string",
+		Value: "UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=", // roughly 2021-12-02
+		//Value: "rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=" // roughly 2021-12-03
+	}
+)
+
+var AppFlags = []cli.Flag{
+	FullNodeServerEndpoint,
+	SyncModeStr,
+	DataDir,
+	GrpcPort,
+	GrpcGatewayPort,
+	GrpcMaxCallRecvMsgSize,
+	GrpcRetryDelay,
+	GrpcRetries,
+	TrustedCurrentCommitteeRoot,
+}
 
 type LightNode struct {
 	cliCtx   *cli.Context
@@ -41,8 +103,6 @@ type LightNode struct {
 	services *runtime.ServiceRegistry
 	lock     sync.RWMutex
 	stop     chan struct{} // Channel to wait for termination notifications.
-	//finalizedStateAtStartUp state.BeaconState
-	//serviceFlagOpts         *serviceFlagOpts
 }
 
 func New(cliCtx *cli.Context) (*LightNode, error) {
@@ -55,60 +115,35 @@ func New(cliCtx *cli.Context) (*LightNode, error) {
 		cancel:   cancel,
 		services: registry,
 		stop:     make(chan struct{}),
-		//stateFeed:               new(event.Feed),
-		//blockFeed:               new(event.Feed),
-		//opFeed:                  new(event.Feed),
-		//attestationPool:         attestations.NewPool(),
-		//exitPool:                voluntaryexits.NewPool(),
-		//slashingsPool:           slashings.NewPool(),
-		//syncCommitteePool:       synccommittee.NewPool(),
-		//slasherBlockHeadersFeed: new(event.Feed),
-		//slasherAttestationsFeed: new(event.Feed),
-		//serviceFlagOpts: &serviceFlagOpts{},
 	}
-
-	//if err := beacon.startDB(cliCtx, depositAddress); err != nil {
-	//	return nil, err
-	//}
 
 	if err := beacon.registerSyncService(); err != nil {
 		return nil, err
 	}
-
 	if err := beacon.registerRpcService(); err != nil {
 		return nil, err
 	}
-
-	//if err := beacon.registerGRPCGateway(); err != nil {
-	//	return nil, err
-	//}
 
 	return beacon, nil
 }
 
 func (ln *LightNode) registerSyncService() error {
-	//var chainService *blockchain.Service
-	//if err := b.services.FetchService(&chainService); err != nil {
-	//	return err
-	//}
-	//var syncService *initialsync.Service
-	//if err := b.services.FetchService(&syncService); err != nil {
-	//	return err
-	//}
-
-	//grpcRetries := ln.cliCtx.Uint(flags.GrpcRetriesFlag.Name)
-	//grpcRetryDelay := ln.cliCtx.Duration(flags.GrpcRetryDelayFlag.Name)
-	//maxCallRecvMsgSize := ln.cliCtx.Int(cmd.GrpcMaxCallRecvMsgSizeFlag.Name)
-	//dataDir := ln.cliCtx.String(cmd.DataDirFlag.Name)
-
 	// TODO: Link the configuration variables with flags
+	syncModeStr := ln.cliCtx.String(SyncModeStr.Name)
+	syncMode := lightsync.ModeLatest // Default
+	if syncModeStr == lightsync.ModeFinality.String() {
+		syncMode = lightsync.ModeFinality
+	}
+	tmplog.Println(syncMode)
 
 	svc, err := lightsync.NewService(ln.ctx, &lightsync.Config{
-		TrustedCurrentCommitteeRoot: TrustedCurrentCommitteeRoot,
-		GrpcRetryDelay:              time.Second * 5,
-		GrpcRetries:                 5,
-		MaxCallRecvMsgSize:          1 << 22,
-		GrpcEndpoint:                "127.0.0.1:4000",
+		TrustedCurrentCommitteeRoot: ln.cliCtx.String(TrustedCurrentCommitteeRoot.Name),
+		SyncMode:                    syncMode,
+		DataDir:                     ln.cliCtx.String(DataDir.Name),
+		FullNodeServerEndpoint:      ln.cliCtx.String(FullNodeServerEndpoint.Name),
+		GrpcRetryDelay:              time.Second * time.Duration(ln.cliCtx.Int(GrpcRetryDelay.Name)),
+		GrpcRetries:                 ln.cliCtx.Int(GrpcRetries.Name),
+		GrpcMaxCallRecvMsgSize:      ln.cliCtx.Int(GrpcMaxCallRecvMsgSize.Name),
 	})
 	if err != nil {
 		panic(err)
@@ -118,31 +153,15 @@ func (ln *LightNode) registerSyncService() error {
 }
 
 func (ln *LightNode) registerRpcService() error {
-	host := ln.cliCtx.String(flags.RPCHostLight.Name)
-	port := ln.cliCtx.String(flags.RPCPortLight.Name)
-	//beaconMonitoringHost := b.cliCtx.String(cmd.MonitoringHostFlag.Name)
-	//beaconMonitoringPort := b.cliCtx.Int(flags.MonitoringPortFlag.Name)
-	//cert := b.cliCtx.String(flags.CertFlag.Name)
-	//key := b.cliCtx.String(flags.KeyFlag.Name)
-	//mockEth1DataVotes := b.cliCtx.Bool(flags.InteropMockEth1DataVotesFlag.Name)
-
-	maxMsgSize := ln.cliCtx.Int(cmd.GrpcMaxCallRecvMsgSizeFlag.Name)
-	//enableDebugRPCEndpoints := b.cliCtx.Bool(flags.EnableDebugRPCEndpoints.Name)
-
-	tmplog.Println(host)
-	tmplog.Println(port)
-	tmplog.Println(maxMsgSize)
-
 	var lightsyncService *lightsync.Service
 	if err := ln.services.FetchService(&lightsyncService); err != nil {
-		return err
+		panic(err)
 	}
 
 	svc, err := lightrpc.NewService(ln.ctx, &lightrpc.Config{
-		Host:        host,
-		Port:        port,
-		MaxMsgSize:  maxMsgSize,
-		SyncService: lightsyncService,
+		GrpcPort:        ln.cliCtx.Int(GrpcPort.Name),
+		GrpcGatewayPort: ln.cliCtx.Int(GrpcGatewayPort.Name),
+		SyncService:     lightsyncService,
 	})
 	if err != nil {
 		panic(err)

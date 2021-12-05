@@ -2,8 +2,6 @@ package main
 
 import (
 	"github.com/prysmaticlabs/go-bitfield"
-	"github.com/prysmaticlabs/prysm/cmd"
-	"github.com/prysmaticlabs/prysm/cmd/beacon-chain/flags"
 	lightnode "github.com/prysmaticlabs/prysm/cmd/lightclient/node"
 
 	v1 "github.com/prysmaticlabs/prysm/proto/eth/v1"
@@ -51,56 +49,27 @@ type Store struct {
 	ValidUpdates []*LightClientUpdate
 }
 
-var (
-	ServerEndpoint = &cli.StringFlag{
-		Name:  "light-client-server-endpoint",
-		Usage: "light-client-server-endpoint",
-		Value: "localhost:4001", // 512 Mb as a default value.
-	}
-	ServerEndpointPort = &cli.IntFlag{
-		Name:  "light-client-server-endpoint-port",
-		Usage: "light-client-server-endpoint port",
-		Value: 536870912, // 512 Mb as a default value.
-	}
-
-	//GrpcMaxCallRecvMsgSizeFlag = &cli.IntFlag{
-	//	Name:  "grpc-max-msg-size",
-	//	Usage: "Integer to define max recieve message call size (default: 4194304 (for 4MB))",
-	//	Value: 1 << 22,
-	//}
-
-)
-
-var appFlags = []cli.Flag{
-	ServerEndpoint,
-	ServerEndpointPort,
-	flags.RPCHostLight,
-	flags.RPCPortLight,
-	cmd.GrpcMaxCallRecvMsgSizeFlag,
-}
-
 func main() {
 	app := cli.App{}
 	app.Name = "beacon-chain-light-client"
 	app.Usage = "Beacon Chain Light Client"
 	app.Action = start
 
-	app.Flags = appFlags
+	app.Flags = lightnode.AppFlags
 
 	if err := app.Run(os.Args); err != nil {
 		log.Error(err.Error())
 	}
-
 }
 
 func start(ctx *cli.Context) error {
 	// Fix data dir for Windows users.
 	//outdatedDataDir := filepath.Join(file.HomeDir(), "AppData", "Roaming", "Eth2")
-	serverEndpoint := ctx.String(ServerEndpoint.Name)
-
-	tmplog.Println(serverEndpoint)
-
-	tmplog.Println("staring light client")
+	//serverEndpoint := ctx.String(lightnode..Name)
+	//
+	//tmplog.Println(serverEndpoint)
+	//
+	//tmplog.Println("staring light client")
 	//count := 0
 	//for {
 	//	tmplog.Println("counting", count)

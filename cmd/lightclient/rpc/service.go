@@ -31,12 +31,12 @@ type Service struct {
 }
 
 type Config struct {
-	Host        string
-	Port        string
-	CertFlag    string
-	KeyFlag     string
-	MaxMsgSize  int
-	SyncService *lightsync.Service
+	GrpcPort        int
+	GrpcGatewayPort int // TODO: add http json gateway
+	SyncService     *lightsync.Service
+	//GrpcMaxCallRecvMsgSize int
+	//GrpcRetryDelay         time.Duration
+	//GrpcRetries            int
 }
 
 func NewService(ctx context.Context, cfg *Config) (*Service, error) {
@@ -60,17 +60,16 @@ func (s *Service) Status() error {
 
 // Start the gRPC server.
 func (s *Service) Start() {
-	address := fmt.Sprintf("%s:%s", s.cfg.Host, s.cfg.Port)
+	address := fmt.Sprintf("%s:%d", "127.0.0.1", s.cfg.GrpcPort)
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
-		log.Errorf("Could not listen to port in Start() %s: %v", address, err)
+		panic(fmt.Errorf("could not listen to port in Start() %s: %v", address, err))
 	}
 	s.listener = lis
 	log.WithField("address", address).Info("gRPC server listening on port")
 
 	// GRPC Server
-	opts := []grpc.ServerOption{}
-	s.grpcServer = grpc.NewServer(opts...)
+	s.grpcServer = grpc.NewServer([]grpc.ServerOption{}...)
 
 	// Register endpoints
 	ethpbv1alpha1.RegisterLightNodeServer(s.grpcServer, &Server{
@@ -81,7 +80,7 @@ func (s *Service) Start() {
 	go func() {
 		if s.listener != nil {
 			if err := s.grpcServer.Serve(s.listener); err != nil {
-				log.Errorf("Could not serve gRPC: %v", err)
+				panic(fmt.Errorf("could not serve gRPC: %v", err))
 			}
 		}
 	}()

@@ -3,12 +3,20 @@ package sync
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
+	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 	middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	grpcutil "github.com/prysmaticlabs/prysm/api/grpc"
+	"github.com/prysmaticlabs/prysm/config/params"
+	"os"
+	"path/filepath"
+	"strings"
+
+	//lightnode "github.com/prysmaticlabs/prysm/cmd/lightclient/node"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"go.opencensus.io/plugin/ocgrpc"
 	"google.golang.org/grpc"
@@ -23,6 +31,24 @@ import (
 //	ValidUpdates []*ethpb.LightClientUpdate
 //}
 
+type SyncMode byte
+
+const (
+	ModeLatest SyncMode = iota
+	ModeFinality
+)
+
+var (
+	EpochsPerSyncCommitteePeriod = params.BeaconConfig().EpochsPerSyncCommitteePeriod
+)
+
+func (s SyncMode) String() string {
+	return []string{
+		"latest",
+		"finality",
+	}[s]
+}
+
 type Service struct {
 	cfg    *Config
 	ctx    context.Context
@@ -30,7 +56,7 @@ type Service struct {
 	lock   sync.RWMutex
 
 	dataDir string
-	store   *ethpb.LightClientStore
+	Store   *ethpb.LightClientStore
 
 	// grpc
 	conn *grpc.ClientConn
@@ -44,25 +70,26 @@ type Service struct {
 }
 
 type Config struct {
-	// The root is used if there is no local DB of LightClientStore
 	TrustedCurrentCommitteeRoot string // Merkle root in base64 string
-	GrpcRetryDelay              time.Duration
-	GrpcRetries                 int
-	MaxCallRecvMsgSize          int
-	GrpcEndpoint                string
+	SyncMode                    SyncMode
+	DataDir                     string
+	// grpc
+	FullNodeServerEndpoint string
+	GrpcMaxCallRecvMsgSize int
+	GrpcRetryDelay         time.Duration
+	GrpcRetries            int
 }
 
 /**
 Design:
-1. The service keep track of "store"
-2. The service save the latest store to disk
+1. The service keep track of "Store"
+2. The service save the latest Store to disk
 
-3. The service recove from "store"
+3. The service recove from "Store"
 */
 
 func NewService(ctx context.Context, cfg *Config) (*Service, error) {
 	ctx, cancel := context.WithCancel(ctx)
-
 	svr := &Service{
 		ctx:    ctx,
 		cancel: cancel,
@@ -75,7 +102,7 @@ func NewService(ctx context.Context, cfg *Config) (*Service, error) {
 func (s *Service) Start() {
 	dialOpts := []grpc.DialOption{
 		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(s.cfg.MaxCallRecvMsgSize),
+			grpc.MaxCallRecvMsgSize(s.cfg.GrpcMaxCallRecvMsgSize),
 			grpc_retry.WithMax(uint(s.cfg.GrpcRetries)),
 			grpc_retry.WithBackoff(grpc_retry.BackoffLinear(s.cfg.GrpcRetryDelay)),
 		),
@@ -97,7 +124,8 @@ func (s *Service) Start() {
 	}
 	//v.ctx = grpcutil.AppendHeaders(s.ctx, s.grpcHeaders)
 
-	conn, err := grpc.DialContext(s.ctx, s.cfg.GrpcEndpoint, dialOpts...)
+	tmplog.Printf("connecting to grpc server: %s", s.cfg.FullNodeServerEndpoint)
+	conn, err := grpc.DialContext(s.ctx, s.cfg.FullNodeServerEndpoint, dialOpts...)
 	if err != nil {
 		panic(err)
 	}
@@ -106,17 +134,23 @@ func (s *Service) Start() {
 
 	// 1. Recover from a file location if possible
 	s.initStore()
+	tmplog.Println("Initialized store.")
 
 	// 2. Use hard coded trustedCurrentCommitteeRoot
 	s.skipSync()
-
-	//tmplog.Println(s.store)
+	tmplog.Println("Finished skip sync.")
 
 	// 3. sync
 	go s.sync(s.ctx)
 }
 
 func (s *Service) initStore() {
+	// Attempt to recover from disk
+	s.tryRecoverSnapshot()
+	if s.Store != nil {
+		return
+	}
+
 	// Fetch a skip-sync-update
 	key, err := base64.StdEncoding.DecodeString(s.cfg.TrustedCurrentCommitteeRoot)
 	if err != nil {
@@ -125,6 +159,10 @@ func (s *Service) initStore() {
 	update, err := s.lightClientServer.GetSkipSyncUpdate(s.ctx, &ethpb.SkipSyncRequest{
 		Key: key,
 	})
+	if err != nil {
+		tmplog.Printf("check if %s is available", s.cfg.FullNodeServerEndpoint)
+		panic(err) // TODO: should retry
+	}
 
 	// Validate
 	err = validateMerkleSkipSyncUpdate(update)
@@ -132,7 +170,7 @@ func (s *Service) initStore() {
 		panic(err) // TODO: retry another skip-sync-update
 
 	}
-	// Initialize a store
+	// Initialize a Store
 	store := &ethpb.LightClientStore{
 		Updates: []*ethpb.LightClientUpdate{},
 		Snapshot: &ethpb.LightClientSnapshot{
@@ -141,15 +179,14 @@ func (s *Service) initStore() {
 			NextSyncCommittee:    update.NextSyncCommittee,
 		},
 	}
-	s.store = store
+	s.Store = store
 }
 
-// Skip sync to the point where this client could use the current LightClientUpdates
+// Skip sync until we could use normal updates (ethereum.eth.v1alpha1.LightClient.GetUpdates) to sync
 func (s *Service) skipSync() {
-	// Find our what is the expected  next-sync-committee
 	resp, err := s.lightClientServer.GetUpdates(s.ctx, &empty.Empty{})
 	if err != nil || len(resp.GetUpdates()) < 1 {
-		panic(err) // TODO: fix
+		panic(err) // TODO: retry
 	}
 	update := resp.Updates[0] // TODO: retry
 	err = validateMerkleAll(update)
@@ -162,19 +199,30 @@ func (s *Service) skipSync() {
 		panic(err)
 	}
 
-	// Skip sync until we could use the expected next-sync-committee
+	storedNextSyncCommRoot, err := s.Store.Snapshot.NextSyncCommittee.HashTreeRoot()
+	if err != nil {
+		panic(err)
+	}
 	count := 0
+	// Skip sync until we could use the expected next-sync-committee
 	for {
-		skipSyncKey, err := s.store.Snapshot.NextSyncCommittee.HashTreeRoot()
-		if err != nil {
-			panic(err)
+		// Stop the skip sync once we could use LightClientUpdate to sync normally
+		if storedNextSyncCommRoot == expectedNextSyncCommRoot {
+			break
 		}
+
+		skipSyncKey, err := s.Store.Snapshot.NextSyncCommittee.HashTreeRoot()
 		if err != nil {
 			panic(err)
 		}
 		skipSyncUpdate, err := s.lightClientServer.GetSkipSyncUpdate(s.ctx, &ethpb.SkipSyncRequest{
 			Key: skipSyncKey[:],
 		})
+		if err != nil && strings.Contains(err.Error(), "cannot find skip sync error") {
+			continue // TODO: This could go on infinite loop or a really long loop
+		} else if err != nil {
+			panic(err)
+		}
 		err = validateMerkleSkipSyncUpdate(skipSyncUpdate)
 		if err != nil {
 			panic(err)
@@ -183,30 +231,37 @@ func (s *Service) skipSync() {
 		// Skip sync
 		s.simpleProcessSkipSyncUpdate(skipSyncUpdate) // TODO: there might be other checks?
 
-		storedCurrentSyncCommRoot, err := s.store.Snapshot.CurrentSyncCommittee.HashTreeRoot()
-		storedNextSyncCommRoot, err := s.store.Snapshot.NextSyncCommittee.HashTreeRoot()
+		storedCurrentSyncCommRoot, err := s.Store.Snapshot.CurrentSyncCommittee.HashTreeRoot()
+		if err != nil {
+			panic(err)
+		}
+		storedNextSyncCommRoot, err := s.Store.Snapshot.NextSyncCommittee.HashTreeRoot()
 		if err != nil {
 			panic(err)
 		}
 
-		tmplog.Println("expected: ", update.Header)
-		tmplog.Println("store:    ", s.store.Snapshot.Header)
-
 		skipSyncNextSyncCommRoot, err := skipSyncUpdate.NextSyncCommittee.HashTreeRoot()
+		if err != nil {
+			panic(err)
+		}
 		skipSyncCurrentSyncCommRoot, err := skipSyncUpdate.CurrentSyncCommittee.HashTreeRoot()
+		if err != nil {
+			panic(err)
+		}
+
+		tmplog.Printf("-----skip sync: %d------", count)
+		tmplog.Println("expected: ", update.Header)
+		tmplog.Println("Store:    ", s.Store.Snapshot.Header)
 
 		tmplog.Println("expected Next:   ", base64.StdEncoding.EncodeToString(expectedNextSyncCommRoot[:]))
 		tmplog.Println("stored   Next:   ", base64.StdEncoding.EncodeToString(storedNextSyncCommRoot[:]))
-		tmplog.Println("skip      Next:  ", base64.StdEncoding.EncodeToString(skipSyncNextSyncCommRoot[:]))
+		tmplog.Println("skip     Next:   ", base64.StdEncoding.EncodeToString(skipSyncNextSyncCommRoot[:]))
 
-		tmplog.Println("store    Current:", base64.StdEncoding.EncodeToString(storedCurrentSyncCommRoot[:]))
+		tmplog.Println("Store    Current:", base64.StdEncoding.EncodeToString(storedCurrentSyncCommRoot[:]))
 		tmplog.Println("skip     Current:", base64.StdEncoding.EncodeToString(skipSyncCurrentSyncCommRoot[:]))
+		tmplog.Println("skip     Period:", int(skipSyncUpdate.Header.Slot)/int(EpochsPerSyncCommitteePeriod))
 
-		// Stop the skip sync once we could use LightClientUpdate to sync normally
-		if storedNextSyncCommRoot == expectedNextSyncCommRoot {
-			break
-		}
-		time.Sleep(time.Second * 30)
+		time.Sleep(time.Second * 1) // TODO: debug only
 		count += 1
 	}
 }
@@ -214,26 +269,27 @@ func (s *Service) skipSync() {
 func (s *Service) sync(ctx context.Context) {
 	count := 0
 	for {
-		currentSyncRoot, _ := s.store.Snapshot.CurrentSyncCommittee.HashTreeRoot()
-		nextSyncRoot, _ := s.store.Snapshot.NextSyncCommittee.HashTreeRoot()
-		tmplog.Printf("----------%d----------", count)
-		tmplog.Println("header slot      :", s.store.Snapshot.Header.Slot)
-		tmplog.Println("current sync     :", base64.StdEncoding.EncodeToString(currentSyncRoot[:]))
-		tmplog.Println("next sync        :", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
-
+		currentSyncRoot, _ := s.Store.Snapshot.CurrentSyncCommittee.HashTreeRoot()
+		nextSyncRoot, _ := s.Store.Snapshot.NextSyncCommittee.HashTreeRoot()
 		resp, err := s.lightClientServer.GetUpdates(s.ctx, &emptypb.Empty{})
 		if err != nil {
-			panic(err) // retry instead
+			panic(err) // TODO: retry instead
 		}
 		update := resp.Updates[0]
 		updateNextSyncRoot, _ := update.NextSyncCommittee.HashTreeRoot()
-		tmplog.Println("update slot      :", update.Header.Slot)
-		tmplog.Println("update next sync :", base64.StdEncoding.EncodeToString(updateNextSyncRoot[:]))
 
-		// TODP: put in processing logic
-		tmplog.Println("start to process the update")
+		tmplog.Printf("----------%d----------", count)
+		tmplog.Println("header slot         :", s.Store.Snapshot.Header.Slot)
+		tmplog.Println("header period       :", int(s.Store.Snapshot.Header.Slot)/int(EpochsPerSyncCommitteePeriod))
+		tmplog.Println("header current sync :", base64.StdEncoding.EncodeToString(currentSyncRoot[:]))
+		tmplog.Println("header next sync    :", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
+		tmplog.Println("update slot         :", update.Header.Slot)
+		tmplog.Println("update period       :", int(update.Header.Slot)/int(EpochsPerSyncCommitteePeriod))
+		tmplog.Println("update next sync    :", base64.StdEncoding.EncodeToString(updateNextSyncRoot[:]))
+
 		s.processLightClientUpdate(update)
 
+		s.saveSnapshot()
 		time.Sleep(time.Second * 12) // TODO: use a slot tick instead
 		count += 1
 	}
@@ -241,17 +297,13 @@ func (s *Service) sync(ctx context.Context) {
 }
 
 func (s *Service) simpleProcessSkipSyncUpdate(update *ethpb.SkipSyncUpdate) {
-	s.store.Snapshot.Header = update.FinalityHeader
-	s.store.Snapshot.CurrentSyncCommittee = update.CurrentSyncCommittee
-	s.store.Snapshot.NextSyncCommittee = update.NextSyncCommittee
+	s.Store.Snapshot.Header = update.FinalityHeader
+	s.Store.Snapshot.CurrentSyncCommittee = update.CurrentSyncCommittee
+	s.Store.Snapshot.NextSyncCommittee = update.NextSyncCommittee
 }
 
-//func (s *Service) processSkipSyncUpdate(update *ethpb.SkipSyncUpdate) {
-//	s.processLightClientUpdate(toLightClientUpdate(update))
-//}
-
 func (s *Service) processLightClientUpdate(update *ethpb.LightClientUpdate) {
-	processLightClientUpdate(s.store, update, s.store.Snapshot.Header.Slot, GenesisValidatorsRoot)
+	processLightClientUpdate(s.Store, update, s.Store.Snapshot.Header.Slot, GenesisValidatorsRoot)
 }
 
 // Stop the blockchain service's main event loop and associated goroutines.
@@ -264,4 +316,61 @@ func (s *Service) Stop() error {
 // this service to be unhealthy.
 func (s *Service) Status() error {
 	return nil
+}
+
+func (s *Service) saveSnapshot() {
+	snapshotBytes, err := proto.Marshal(s.Store)
+	if err != nil {
+		panic(err)
+	}
+	filename := s.getStoreFileName()
+	tmplog.Printf("Saving store to: %s", filename)
+	err = os.WriteFile(filename, snapshotBytes, 0666)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (s *Service) getStoreFileName() string {
+	dir, err := filepath.Abs(s.cfg.DataDir)
+	if err != nil {
+		panic(err)
+	}
+	return filepath.Join(dir, "store.proto-byte")
+}
+
+func (s *Service) tryRecoverSnapshot() {
+	filename := s.getStoreFileName()
+	tmplog.Printf("Recovering store from: %s", filename)
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		tmplog.Println(err)
+		return
+	}
+	store := &ethpb.LightClientStore{}
+	err = proto.Unmarshal(data, store)
+	if err != nil {
+		panic(err)
+	}
+	s.Store = store
+	tmplog.Println("Recovered store.snapshot: %s", SnapshotToString(s.Store.Snapshot))
+}
+
+func SnapshotToString(snapshot *ethpb.LightClientSnapshot) string {
+	_currentSyncCommRoot, err := snapshot.CurrentSyncCommittee.HashTreeRoot()
+	if err != nil {
+		panic(err)
+	}
+	currentSyncCommRoot := base64.StdEncoding.EncodeToString(_currentSyncCommRoot[:])
+
+	_nextSyncCommRoot, err := snapshot.NextSyncCommittee.HashTreeRoot()
+	if err != nil {
+		panic(err)
+	}
+	nextSyncCommRoot := base64.StdEncoding.EncodeToString(_nextSyncCommRoot[:])
+	headerStr := snapshot.Header.String()
+	s := fmt.Sprintf("header=%s|current-sync=%s|next-sync=%s", headerStr, currentSyncCommRoot, nextSyncCommRoot)
+
+	return s
 }

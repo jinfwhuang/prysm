@@ -8,13 +8,23 @@ go run ./cmd/beacon-chain --datadir=../prysm-data/mainnet --http-web3provider=ht
 
 # Check the necessary APIs are available 
 grpcurl -plaintext localhost:4000 list ethereum.eth.v1alpha1.LightClient
-ethereum.eth.v1alpha1.LightClient.GetSkipSyncUpdate
-ethereum.eth.v1alpha1.LightClient.GetUpdates
+
+# Ge the current head
+grpcurl -plaintext localhost:4001 ethereum.eth.v1alpha1.LightNode.Head
 
 # Start light client
-go run -v ./cmd/lightclient/
+go run -v ./cmd/lightclient/ \
+--full-node-server-endpoint=127.0.0.1:4000 \
+--grpc-port=4001 \
+--data-dir=../prysm-data/lightnode \
+--sync-mode=latest \
+--trusted-current-committee-root='rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8='
+
+# UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=  // roughly 2021-12-02
+# rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=  // roughly 2021-12-03
+
 ```
 
-## Notes
+## Big TODOs
 - Move the core light-client code outside of `cmd/.` 
 - 
