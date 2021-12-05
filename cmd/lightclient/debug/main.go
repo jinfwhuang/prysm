@@ -2,22 +2,26 @@ package main
 
 import (
 	"context"
-	middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
-	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	grpcutil "github.com/prysmaticlabs/prysm/api/grpc"
-	lightnode "github.com/prysmaticlabs/prysm/cmd/lightclient/node"
-	"github.com/prysmaticlabs/prysm/proto/eth/service"
+	"encoding/base64"
+	"github.com/golang/protobuf/ptypes/empty"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
-	"go.opencensus.io/plugin/ocgrpc"
 	"google.golang.org/grpc"
 	tmplog "log"
-	"os"
-
-	v1 "github.com/prysmaticlabs/prysm/proto/eth/v1"
-	v2 "github.com/prysmaticlabs/prysm/proto/eth/v2"
 )
+
+func main2() {
+	//server1 := service.NewBeaconChainClient(conn)
+	//
+	//headers, err := server1.ListBlockHeaders(ctx, &v1.BlockHeadersRequest{})
+	//if err != nil {
+	//	panic(err)
+	//}
+	//data := headers.Data[0]
+	//stateRoot := data.Header.Message.StateRoot
+	//
+	//server2 := ethpb.NewBeaconChainClient(conn)
+	//server2.GetChainHead()
+}
 
 func main() {
 	ctx := context.Background()
@@ -45,32 +49,19 @@ func main() {
 	}
 	//v.ctx = grpcutil.AppendHeaders(s.ctx, s.grpcHeaders)
 
-	tmplog.Printf("connecting to grpc server: %s", "localhost:4000")
+	addr := "localhost:4000"
+	tmplog.Printf("connecting to grpc server: %s", addr)
 	conn, err := grpc.DialContext(ctx, "localhost:4000", dialOpts...)
 	if err != nil {
 		panic(err)
 	}
-	server1 := service.NewBeaconChainClient(conn)
+	server := ethpb.NewLightClientClient(conn)
 
-	headers, err := server1.ListBlockHeaders(ctx, &v1.BlockHeadersRequest{})
+	resp, err := server.DebugGetTrustedCurrentCommitteeRoot(ctx, &empty.Empty{})
 	if err != nil {
 		panic(err)
 	}
-	data := headers.Data[0]
-	stateRoot := data.Header.Message.StateRoot
-
-	server2 := ethpb.NewBeaconChainClient(conn)
-	server2.GetChainHead()
-
-	resp, err := server1.ListSyncCommittees(ctx, &v2.StateSyncCommitteesRequest{
-		StateId: stateRoot,
-	})
-
-	ethpb.SyncCommittee{}
-
-	if err != nil {
-		panic(err)
-	}
-	resp.Data
-
+	key := base64.StdEncoding.EncodeToString(resp.Key)
+	tmplog.Printf("Here is a recent started point from addrss: %s", addr)
+	tmplog.Printf("--trusted-current-committee-root='%s'", key)
 }

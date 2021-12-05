@@ -87,7 +87,7 @@ GET /eth/light-client/v1/updates
 //    }
 
 message LightClientStore {
-  ethereum.eth.v1alpha1.LightClientSnapshot store = 1;
+  ethereum.eth.v1alpha1.LightClientSnapshot snapshot = 1;
   repeated ethereum.eth.v1alpha1.LightClientUpdate updates = 2;
 }
 
