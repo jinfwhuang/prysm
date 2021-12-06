@@ -137,7 +137,7 @@ func (s *Service) Start() {
 	s.initStore()
 	tmplog.Println("Initialized store.")
 
-	// 2. Use hard coded trustedCurrentCommitteeRoot
+	// 2. Sky sync to current sync-committee
 	s.skipSync()
 	tmplog.Println("Finished skip sync.")
 
@@ -147,12 +147,14 @@ func (s *Service) Start() {
 
 func (s *Service) initStore() {
 	// Attempt to recover from disk
-	s.tryRecoverSnapshot()
+	s.tryRecoverStore()
 	if s.Store != nil {
 		return
 	}
 
+	// Init store for the first time
 	// Fetch a skip-sync-update
+	tmplog.Println("Initializing a LightClientStore ...")
 	key, err := base64.StdEncoding.DecodeString(s.cfg.TrustedCurrentCommitteeRoot)
 	if err != nil {
 		panic(err)
@@ -216,6 +218,8 @@ func (s *Service) skipSync() {
 		if err != nil && strings.Contains(err.Error(), "cannot find skip sync error") {
 			tmplog.Println(err)
 			tmplog.Println("keep trying to find the same skip-sync object; we might be running a infinite loop")
+			time.Sleep(time.Second * 1) // TODO: debug only
+			count += 1
 			continue // TODO: This could go on infinite loop or a really long loop
 		} else if err != nil {
 			panic(err)
@@ -232,7 +236,7 @@ func (s *Service) skipSync() {
 		if err != nil {
 			panic(err)
 		}
-		storedNextSyncCommRoot, err := s.Store.Snapshot.NextSyncCommittee.HashTreeRoot()
+		storedNextSyncCommRoot, err = s.Store.Snapshot.NextSyncCommittee.HashTreeRoot()
 		if err != nil {
 			panic(err)
 		}
@@ -246,6 +250,7 @@ func (s *Service) skipSync() {
 			panic(err)
 		}
 
+		// DEBUG messages only
 		tmplog.Printf("-----skip sync: %d------", count)
 		tmplog.Println("expected: ", update.Header)
 		tmplog.Println("Store:    ", s.Store.Snapshot.Header)
@@ -336,13 +341,14 @@ func (s *Service) getStoreFileName() string {
 	return filepath.Join(dir, "store.proto-byte")
 }
 
-func (s *Service) tryRecoverSnapshot() {
+func (s *Service) tryRecoverStore() {
 	filename := s.getStoreFileName()
 	tmplog.Printf("Recovering store from: %s", filename)
 
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		tmplog.Println(err)
+		tmplog.Println("cannot recover a store")
 		return
 	}
 	store := &ethpb.LightClientStore{}
@@ -378,6 +384,7 @@ func (s *Service) lookupSkipSync(key []byte) (*ethpb.SkipSyncUpdate, error) {
 		Key: key,
 	})
 	if err != nil && strings.Contains(err.Error(), "cannot find skip sync error") {
+		tmplog.Println("----debug message-----")
 		recommendedKeyStr := lightclientdebug.GetTrustedCurrentCommitteeRoot()
 		keyStr := base64.StdEncoding.EncodeToString(key)
 

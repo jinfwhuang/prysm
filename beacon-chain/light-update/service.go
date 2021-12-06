@@ -21,12 +21,6 @@ func init() {
 	tmplog.SetFlags(tmplog.Llongfile)
 }
 
-type UpdatesFetcher interface {
-	BestUpdateForPeriod(ctx context.Context, period uint64) (*ethpb.LightClientUpdate, error)
-	LatestFinalizedUpdate(ctx context.Context) *ethpb.LightClientUpdate
-	LatestNonFinalizedUpdate(ctx context.Context) *ethpb.LightClientUpdate
-}
-
 type Config struct {
 	StateGen                    stategen.StateManager
 	Database                    iface.Database

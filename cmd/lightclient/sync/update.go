@@ -17,7 +17,6 @@ import (
 )
 
 func toLightClientUpdate(update *ethpb.SkipSyncUpdate) *ethpb.LightClientUpdate {
-	tmplog.Println(update)
 	return &ethpb.LightClientUpdate{
 		Header:                  update.Header,
 		NextSyncCommittee:       update.NextSyncCommittee,

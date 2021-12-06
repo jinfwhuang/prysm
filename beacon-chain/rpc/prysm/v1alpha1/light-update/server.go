@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/base64"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/prysmaticlabs/prysm/beacon-chain/light"
+	"github.com/prysmaticlabs/prysm/beacon-chain/light-update"
 	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	tmplog "log"
 )
 
 type Server struct {
-	LightClientService *light.Service
+	LightUpdateService *light.Service
 }
 
 func init() {
@@ -23,7 +23,7 @@ const (
 )
 
 func (s *Server) GetUpdates(ctx context.Context, _ *empty.Empty) (*ethpb.UpdatesResponse, error) {
-	q := s.LightClientService.Queue
+	q := s.LightUpdateService.Queue
 	size := updatesResponseSize
 	if size > q.Len() {
 		size = q.Len()
@@ -42,7 +42,7 @@ func (s *Server) GetUpdates(ctx context.Context, _ *empty.Empty) (*ethpb.Updates
 }
 
 func (s *Server) GetSkipSyncUpdate(ctx context.Context, req *ethpb.SkipSyncRequest) (*ethpb.SkipSyncUpdate, error) {
-	update, err := s.LightClientService.GetSkipSyncUpdate(ctx, bytesutil.ToBytes32(req.Key))
+	update, err := s.LightUpdateService.GetSkipSyncUpdate(ctx, bytesutil.ToBytes32(req.Key))
 	if err != nil {
 		return nil, err
 	}
@@ -55,8 +55,9 @@ func (s *Server) GetSkipSyncUpdate(ctx context.Context, req *ethpb.SkipSyncReque
 	return update, nil
 }
 
+// TODO: only use for debug only
 func (s *Server) DebugGetTrustedCurrentCommitteeRoot(ctx context.Context, empty *empty.Empty) (*ethpb.DebugGetTrustedCurrentCommitteeRootResp, error) {
-	syncComm, err := s.LightClientService.GetCurrentSyncComm(ctx)
+	syncComm, err := s.LightUpdateService.GetCurrentSyncComm(ctx)
 	root, err := syncComm.HashTreeRoot()
 	if err != nil {
 		return nil, err
