@@ -1,6 +1,8 @@
+## Light-client Server
 
-
-## Dev
+This is implemented as the "light-update" service and server in the beacon node.
+- service: beacon-chain/light-update/service.go
+- api server: beacon-chain/rpc/prysm/v1alpha1/light-update
 
 ```bash
 # Start a server that supports the APIs needed by a light client
@@ -8,31 +10,31 @@ go run ./cmd/beacon-chain --datadir=../prysm-data/mainnet --http-web3provider=ht
 
 # Check the necessary APIs are available 
 grpcurl -plaintext localhost:4000 list ethereum.eth.v1alpha1.LightClient
+```
 
-# Ge the current head
-grpcurl -plaintext localhost:4001 ethereum.eth.v1alpha1.LightNode.Head
+## Light-client Client
 
+This is a new, independent program. All the codes are: cmd/light-client
+- exposed api: cmd/light-client/rpc/server.go 
+
+```bash
 # Start light client
 go run -v ./cmd/lightclient/ \
 --full-node-server-endpoint=127.0.0.1:4000 \
 --grpc-port=4001 \
 --data-dir=../prysm-data/lightnode \
 --sync-mode=latest \
---trusted-current-committee-root='rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8='
+--trusted-current-committee-root='xxxx'
 
-# UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=  // roughly 2021-12-02
-# rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=  // roughly 2021-12-03
+# --trusted-current-committee-root='UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M='  // roughly 2021-12-02
+# --trusted-current-committee-root='rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8='  // roughly 2021-12-03
 
-# Start with fault trusted-root
-go run -v ./cmd/lightclient/ \
---full-node-server-endpoint=127.0.0.1:4000 \
---grpc-port=4001 \
---data-dir=../prysm-data/lightnode \
---sync-mode=latest \
---trusted-current-committee-root='aaaaaaE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8='
-
+# Ge the current head
+grpcurl -plaintext localhost:4001 ethereum.eth.v1alpha1.LightNode.Head
 ```
+
+
 
 ## Big TODOs
 - Move the core light-client code outside of `cmd/.` 
-- 
+- etc.

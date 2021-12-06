@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"github.com/golang/protobuf/ptypes/empty"
 	lightsync "github.com/prysmaticlabs/prysm/cmd/light-client/sync"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
@@ -27,11 +28,10 @@ func (s *Server) debug() {
 }
 
 func (s *Server) Head(ctx context.Context, _ *empty.Empty) (*ethpb.BeaconBlockHeader, error) {
-	s.debug()
+	//s.debug()
 	return s.syncService.Store.Snapshot.Header, nil
 }
 
 func (s *Server) FinalizedHead(ctx context.Context, _ *empty.Empty) (*ethpb.BeaconBlockHeader, error) {
-	s.debug()
-	return s.syncService.Store.Snapshot.Header, nil
+	return nil, fmt.Errorf("not implemented")
 }
