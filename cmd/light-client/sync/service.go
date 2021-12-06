@@ -17,7 +17,7 @@ import (
 	"strings"
 
 	//lightnode "github.com/prysmaticlabs/prysm/cmd/lightclient/node"
-	lightclientdebug "github.com/prysmaticlabs/prysm/cmd/lightclient/debug"
+	lightclientdebug "github.com/prysmaticlabs/prysm/cmd/light-client/debug"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	"go.opencensus.io/plugin/ocgrpc"
 	"google.golang.org/grpc"

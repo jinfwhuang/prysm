@@ -2,10 +2,10 @@ package node
 
 import (
 	"context"
-	lightutil "github.com/prysmaticlabs/prysm/cmd/lightclient/util"
+	lightutil "github.com/prysmaticlabs/prysm/cmd/light-client/util"
 	//"github.com/prysmaticlabs/prysm/cmd/lightclient"
-	lightrpc "github.com/prysmaticlabs/prysm/cmd/lightclient/rpc"
-	lightsync "github.com/prysmaticlabs/prysm/cmd/lightclient/sync"
+	lightrpc "github.com/prysmaticlabs/prysm/cmd/light-client/rpc"
+	lightsync "github.com/prysmaticlabs/prysm/cmd/light-client/sync"
 	"github.com/prysmaticlabs/prysm/runtime"
 	"github.com/prysmaticlabs/prysm/runtime/debug"
 	tmplog "log"

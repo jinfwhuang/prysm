@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"github.com/golang/protobuf/ptypes/empty"
-	lightsync "github.com/prysmaticlabs/prysm/cmd/lightclient/sync"
+	lightsync "github.com/prysmaticlabs/prysm/cmd/light-client/sync"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	tmplog "log"
 )
