@@ -17,6 +17,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	types "github.com/prysmaticlabs/eth2-types"
 	apigateway "github.com/prysmaticlabs/prysm/api/gateway"
 	"github.com/prysmaticlabs/prysm/async/event"
 	"github.com/prysmaticlabs/prysm/beacon-chain/blockchain"
@@ -28,7 +29,7 @@ import (
 	"github.com/prysmaticlabs/prysm/beacon-chain/forkchoice"
 	"github.com/prysmaticlabs/prysm/beacon-chain/forkchoice/protoarray"
 	"github.com/prysmaticlabs/prysm/beacon-chain/gateway"
-	"github.com/prysmaticlabs/prysm/beacon-chain/light"
+	"github.com/prysmaticlabs/prysm/beacon-chain/monitor"
 	"github.com/prysmaticlabs/prysm/beacon-chain/node/registration"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/attestations"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/slashings"
@@ -194,10 +195,6 @@ func New(cliCtx *cli.Context, opts ...Option) (*BeaconNode, error) {
 		return nil, err
 	}
 
-	if err := beacon.registerLightClientService(); err != nil {
-		return nil, err
-	}
-
 	if err := beacon.registerSlasherService(); err != nil {
 		return nil, err
 	}
@@ -207,6 +204,10 @@ func New(cliCtx *cli.Context, opts ...Option) (*BeaconNode, error) {
 	}
 
 	if err := beacon.registerGRPCGateway(); err != nil {
+		return nil, err
+	}
+
+	if err := beacon.registerValidatorMonitorService(); err != nil {
 		return nil, err
 	}
 
@@ -488,7 +489,7 @@ func (b *BeaconNode) registerP2P(cliCtx *cli.Context) error {
 		MetaDataDir:       cliCtx.String(cmd.P2PMetadata.Name),
 		TCPPort:           cliCtx.Uint(cmd.P2PTCPPort.Name),
 		UDPPort:           cliCtx.Uint(cmd.P2PUDPPort.Name),
-		MaxPeers:          cliCtx.Uint(cmd.P2PMaxPeers.Name),
+		MaxPeers:          cliCtx.Uint64(cmd.P2PMaxPeers.Name),
 		AllowListCIDR:     cliCtx.String(cmd.P2PAllowList.Name),
 		DenyListCIDR:      slice.SplitCommaSeparated(cliCtx.StringSlice(cmd.P2PDenyList.Name)),
 		EnableUPnP:        cliCtx.Bool(cmd.EnableUPnPFlag.Name),
@@ -686,11 +687,6 @@ func (b *BeaconNode) registerRPCService() error {
 		return err
 	}
 
-	var lightService *light.Service
-	if err := b.services.FetchService(&lightService); err != nil {
-		return err
-	}
-
 	var slasherService *slasher.Service
 	if features.Get().EnableSlasher {
 		if err := b.services.FetchService(&slasherService); err != nil {
@@ -729,7 +725,6 @@ func (b *BeaconNode) registerRPCService() error {
 	}
 
 	p2pService := b.fetchP2P()
-	lightClientService := b.fetchLightClientService()
 	rpcService := rpc.NewService(b.ctx, &rpc.Config{
 		Host:                    host,
 		Port:                    port,
@@ -768,7 +763,6 @@ func (b *BeaconNode) registerRPCService() error {
 		StateGen:                b.stateGen,
 		EnableDebugRPCEndpoints: enableDebugRPCEndpoints,
 		MaxMsgSize:              maxMsgSize,
-		LightClientService:      lightClientService,
 	})
 
 	return b.services.RegisterService(rpcService)
@@ -879,33 +873,32 @@ func (b *BeaconNode) registerDeterminsticGenesisService() error {
 	return nil
 }
 
-func (b *BeaconNode) registerLightClientService() error {
+func (b *BeaconNode) registerValidatorMonitorService() error {
+	if cmd.ValidatorMonitorIndicesFlag.Value == nil {
+		return nil
+	}
+	cliSlice := cmd.ValidatorMonitorIndicesFlag.Value.Value()
+	if cliSlice == nil {
+		return nil
+	}
+	tracked := make([]types.ValidatorIndex, len(cliSlice))
+	for i := range tracked {
+		tracked[i] = types.ValidatorIndex(cliSlice[i])
+	}
+
 	var chainService *blockchain.Service
 	if err := b.services.FetchService(&chainService); err != nil {
 		return err
 	}
-	var syncService *initialsync.Service
-	if err := b.services.FetchService(&syncService); err != nil {
+	monitorConfig := &monitor.ValidatorMonitorConfig{
+		StateNotifier:       b,
+		AttestationNotifier: b,
+		StateGen:            b.stateGen,
+		HeadFetcher:         chainService,
+	}
+	svc, err := monitor.NewService(b.ctx, monitorConfig, tracked)
+	if err != nil {
 		return err
 	}
-	svc := light.New(b.ctx, &light.Config{
-		Database:                    b.db,
-		StateGen:                    b.stateGen,
-		HeadFetcher:                 chainService,
-		FinalizationFetcher:         chainService,
-		StateNotifier:               b,
-		TimeFetcher:                 chainService,
-		SyncChecker:                 syncService,
-		LightClientUpdatesQueueSize: 32, // TODO: jin; allowed this to be passed in from command line
-	})
-
 	return b.services.RegisterService(svc)
-}
-
-func (b *BeaconNode) fetchLightClientService() *light.Service {
-	var s *light.Service
-	if err := b.services.FetchService(&s); err != nil {
-		panic(err)
-	}
-	return s
 }

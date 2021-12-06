@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	types "github.com/prysmaticlabs/eth2-types"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/altair"
@@ -117,9 +118,9 @@ func TestProcessSlashings(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hook := logTest.NewGlobal()
 			s := &Service{
-				TrackedValidators: map[types.ValidatorIndex]interface{}{
-					1: nil,
-					2: nil,
+				TrackedValidators: map[types.ValidatorIndex]bool{
+					1: true,
+					2: true,
 				},
 			}
 			s.processSlashings(wrapper.WrappedPhase0BeaconBlock(tt.block))
@@ -205,7 +206,7 @@ func TestProcessBlock_AllEventsTrackedVals(t *testing.T) {
 	idx := b.Block.Body.ProposerSlashings[0].Header_1.Header.ProposerIndex
 	s.RLock()
 	if !s.trackedIndex(idx) {
-		s.TrackedValidators[idx] = nil
+		s.TrackedValidators[idx] = true
 		s.latestPerformance[idx] = ValidatorLatestPerformance{
 			balance: 31900000000,
 		}
@@ -218,7 +219,7 @@ func TestProcessBlock_AllEventsTrackedVals(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, s.config.StateGen.SaveState(ctx, root, genesis))
 	wanted1 := fmt.Sprintf("\"Proposed block was included\" BalanceChange=100000000 BlockRoot=%#x NewBalance=32000000000 ParentRoot=0xf732eaeb7fae ProposerIndex=15 Slot=1 Version=1 prefix=monitor", bytesutil.Trunc(root[:]))
-	wanted2 := fmt.Sprintf("\"Proposer slashing was included\" ProposerIndex=%d Root1=0x000100000000 Root2=0x000200000000 SlashingSlot=0 Slot:=1 prefix=monitor", idx)
+	wanted2 := fmt.Sprintf("\"Proposer slashing was included\" ProposerIndex=%d Root1=0x000100000000 Root2=0x000200000000 SlashingSlot=0 Slot=1 prefix=monitor", idx)
 	wanted3 := "\"Sync committee contribution included\" BalanceChange=0 Contributions=3 ExpectedContrib=3 NewBalance=32000000000 ValidatorIndex=1 prefix=monitor"
 	wanted4 := "\"Sync committee contribution included\" BalanceChange=0 Contributions=1 ExpectedContrib=1 NewBalance=32000000000 ValidatorIndex=2 prefix=monitor"
 	wrapped, err := wrapper.WrappedAltairSignedBeaconBlock(b)
@@ -228,4 +229,18 @@ func TestProcessBlock_AllEventsTrackedVals(t *testing.T) {
 	require.LogsContain(t, hook, wanted2)
 	require.LogsContain(t, hook, wanted3)
 	require.LogsContain(t, hook, wanted4)
+}
+
+func TestLogAggregatedPerformance(t *testing.T) {
+	hook := logTest.NewGlobal()
+	s := setupService(t)
+
+	s.logAggregatedPerformance()
+	time.Sleep(3000 * time.Millisecond)
+	wanted := "\"Aggregated performance since launch\" AttestationInclusion=\"80.00%\"" +
+		" AverageInclusionDistance=1.2 BalanceChangePct=\"0.95%\" CorrectlyVotedHeadPct=\"66.67%\" " +
+		"CorrectlyVotedSourcePct=\"91.67%\" CorrectlyVotedTargetPct=\"100.00%\" StartBalance=31700000000 " +
+		"StartEpoch=0 TotalAggregations=0 TotalProposedBlocks=1 TotalRequested=15 TotalSyncContributions=0 " +
+		"ValidatorIndex=1 prefix=monitor"
+	require.LogsContain(t, hook, wanted)
 }
