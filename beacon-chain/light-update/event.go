@@ -115,11 +115,15 @@ func (s *Service) maintainQueueLightClientUpdates(ctx context.Context, block blo
 		Header:                  header.Header,
 		NextSyncCommittee:       nextCom,
 		NextSyncCommitteeBranch: nextSyncCommitteeBranch,
-		FinalityHeader:          finalityHeader,
-		FinalityBranch:          finalityCheckpointRootBranch,
-		SyncCommitteeBits:       syncAgg.SyncCommitteeBits,
-		SyncCommitteeSignature:  syncAgg.SyncCommitteeSignature,
-		ForkVersion:             state.Fork().CurrentVersion,
+
+		// TODO: This uses a different interpretation than https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/sync-protocol.md
+		//       Also see: https://github.com/ethereum/consensus-specs/pull/2762
+		FinalityHeader: finalityHeader,
+		FinalityBranch: finalityCheckpointRootBranch,
+
+		SyncCommitteeBits:      syncAgg.SyncCommitteeBits,
+		SyncCommitteeSignature: syncAgg.SyncCommitteeSignature,
+		ForkVersion:            state.Fork().CurrentVersion,
 	}
 
 	s.Queue.Enqueue(update)
