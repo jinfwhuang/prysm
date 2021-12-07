@@ -391,7 +391,7 @@ func (s *Service) logNewClientConnection(ctx context.Context) {
 		if !s.connectedRPCClients[clientInfo.Addr] {
 			log.WithFields(logrus.Fields{
 				"addr": clientInfo.Addr.String(),
-			}).Infof("New gRPC client connected to beacon node")
+			}).Infof("gRPC client connected to beacon node")
 			s.connectedRPCClients[clientInfo.Addr] = true
 		}
 	}
