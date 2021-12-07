@@ -1,0 +1,220 @@
+package light
+
+import (
+	"context"
+	"encoding/base64"
+	"fmt"
+	"github.com/pkg/errors"
+	"github.com/prysmaticlabs/prysm/beacon-chain/core/feed"
+	statefeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/state"
+	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
+	//vv1 "github.com/prysmaticlabs/prysm/beacon-chain/state/v1"
+	statev2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
+	log "github.com/sirupsen/logrus"
+	tmplog "log"
+	//"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
+	//"github.com/prysmaticlabs/prysm/encoding/ssz"
+	//"github.com/prysmaticlabs/prysm/network/forks"
+	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1/block"
+)
+
+const (
+	finalizedCheckpointStateIndex = 20
+	nextSyncCommitteeStateIndex   = 23
+)
+
+func (s *Service) GetChainHeadAndState(ctx context.Context) (block.SignedBeaconBlock, state.BeaconState, error) {
+	head, err := s.cfg.HeadFetcher.HeadBlock(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if head == nil || head.IsNil() {
+		return nil, nil, errors.New("head block is nil")
+	}
+	st, err := s.cfg.HeadFetcher.HeadState(ctx)
+	if err != nil {
+		return nil, nil, errors.New("head state is nil")
+	}
+	if st == nil || st.IsNil() {
+		return nil, nil, err
+	}
+	return head, st, nil
+}
+
+func (s *Service) subscribeHeadEvent(ctx context.Context) {
+	stateChan := make(chan *feed.Event, 1)
+	sub := s.cfg.StateNotifier.StateFeed().Subscribe(stateChan)
+	defer sub.Unsubscribe()
+	for {
+		select {
+		case ev := <-stateChan:
+			if ev.Type == statefeed.NewHead {
+				head, beaconState, err := s.GetChainHeadAndState(ctx)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				if err := s.maintainQueueLightClientUpdates(ctx, head, beaconState); err != nil {
+					log.Error(err)
+					continue
+				}
+			}
+		case <-sub.Err():
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// Use the blocks to build light-client-updates
+func (s *Service) maintainQueueLightClientUpdates(ctx context.Context, block block.SignedBeaconBlock, state state.BeaconState) error {
+	_state := state.(*statev2.BeaconState)
+	ztypeState := ztype.FromBeaconState(_state)
+
+	// Header
+	header, err := block.Header()
+	if err != nil {
+		return err
+	}
+
+	//currentCom := state.CurrentSyncCommittee()
+	nextCom, err := state.NextSyncCommittee()
+	if err != nil {
+		return err
+	}
+	nextSyncCommitteeBranch := ztypeState.GetBranch(ztypeState.GetGIndex(23))
+
+	// Finality information
+	fCheckpoint := state.FinalizedCheckpoint()
+	finalityBlock, err := s.cfg.Database.Block(ctx, bytesutil.ToBytes32(fCheckpoint.Root))
+	if err != nil {
+		return err
+	}
+	signedFinalityHeader, err := finalityBlock.Header()
+	finalityHeader := signedFinalityHeader.Header
+	if err != nil {
+		return err
+	}
+	//finalityState, err := s.cfg.Database.State(ctx, bytesutil.ToBytes32(fCheckpoint.Root))
+	//if err != nil {
+	//	return err
+	//}
+	//ztypeFinalityState := ztype.FromBeaconState(finalityState.(*statev2.BeaconState))
+	finalityCheckpointRootBranch := ztypeState.GetBranch(ztypeState.GetGIndex(20, 1))
+
+	syncAgg, err := block.Block().Body().SyncAggregate()
+	if err != nil {
+		return err
+	}
+
+	update := &ethpb.LightClientUpdate{
+		Header:                  header.Header,
+		NextSyncCommittee:       nextCom,
+		NextSyncCommitteeBranch: nextSyncCommitteeBranch,
+		FinalityHeader:          finalityHeader,
+		FinalityBranch:          finalityCheckpointRootBranch,
+		SyncCommitteeBits:       syncAgg.SyncCommitteeBits,
+		SyncCommitteeSignature:  syncAgg.SyncCommitteeSignature,
+		ForkVersion:             state.Fork().CurrentVersion,
+	}
+
+	s.Queue.Enqueue(update)
+
+	// Skip Sync
+	currentCom, err := state.CurrentSyncCommittee()
+	if err != nil {
+		return err
+	}
+	currentSyncCommitteeBranch := ztypeState.GetBranch(ztypeState.GetGIndex(22)) // current_sync_committee, 22
+
+	skipSyncUpdate := &ethpb.SkipSyncUpdate{
+		Header:                     header.Header,
+		CurrentSyncCommittee:       currentCom,
+		CurrentSyncCommitteeBranch: currentSyncCommitteeBranch,
+		NextSyncCommittee:          nextCom,
+		NextSyncCommitteeBranch:    nextSyncCommitteeBranch,
+		FinalityHeader:             finalityHeader,
+		FinalityBranch:             finalityCheckpointRootBranch,
+		SyncCommitteeBits:          syncAgg.SyncCommitteeBits,
+		SyncCommitteeSignature:     syncAgg.SyncCommitteeSignature,
+		ForkVersion:                state.Fork().CurrentVersion,
+	}
+
+	skipSyncUpdate = s.bestSkipSyncUpdate(ctx, skipSyncUpdate)
+
+	s.cfg.Database.SaveSkipSyncUpdate(ctx, skipSyncUpdate)
+
+	//saveSsz(block.Block(), ztypeState, finalityBlock.Block())
+
+	skipSyncCurrentSyncCommRoot, err := skipSyncUpdate.CurrentSyncCommittee.HashTreeRoot()
+	skipSyncNextSyncCommRoot, err := skipSyncUpdate.NextSyncCommittee.HashTreeRoot()
+	updatecNextSyncCommRoot, err := update.NextSyncCommittee.HashTreeRoot()
+
+	tmplog.Println("skip     Current:", base64.StdEncoding.EncodeToString(skipSyncCurrentSyncCommRoot[:]))
+	tmplog.Println("skip        Next:", base64.StdEncoding.EncodeToString(skipSyncNextSyncCommRoot[:]))
+	tmplog.Println("update      Next:", base64.StdEncoding.EncodeToString(updatecNextSyncCommRoot[:]))
+
+	return nil
+}
+
+// TODO: improve on how to choose which SkipSyncUpdate to keep
+func (s *Service) bestSkipSyncUpdate(ctx context.Context, newUpdate *ethpb.SkipSyncUpdate) *ethpb.SkipSyncUpdate {
+	key, err := newUpdate.CurrentSyncCommittee.HashTreeRoot()
+	if err != nil {
+		panic(err)
+	}
+	update, err := s.GetSkipSyncUpdate(ctx, bytesutil.ToBytes32(key[:]))
+	if err != nil {
+		return newUpdate
+	}
+
+	oldParticipation := numOfSetBits(update.SyncCommitteeBits)
+	newParticipation := numOfSetBits(newUpdate.SyncCommitteeBits)
+
+	tmplog.Println("oldParticipation", oldParticipation, "newParticipation", newParticipation)
+
+	// Criteria 1: Compare which update has the most participation
+	if newParticipation >= oldParticipation {
+		return newUpdate
+	} else {
+		return update
+	}
+}
+
+func numOfSetBits(b []byte) int {
+	bitStr := fmt.Sprintf("%08b", b)
+	// TODO: hack; use bit operation instead
+	count := 0
+	countZero := 0
+	for _, c := range bitStr {
+		if c == '1' {
+			count += 1
+		} else if c == '0' {
+			countZero += 1
+		}
+	}
+	if count+countZero != 512 { // TODO: Hack
+		panic("bit field is not 512")
+	}
+
+	//count := uint64(0)
+	//for n != 0 {
+	//	count += n & 1
+	//	n >>= 1
+	//}
+	//tmplog.Println("count", count)
+
+	return count
+}
+
+//// Use the blocks to build light-client-updates
+//func (s *Service) maintainSkipSyncUpdates(ctx context.Context, block block.SignedBeaconBlock, state state.BeaconState) error {
+//
+//
+//
+//	return nil
+//}

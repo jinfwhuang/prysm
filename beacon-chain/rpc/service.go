@@ -5,7 +5,7 @@ package rpc
 import (
 	"context"
 	"errors"
-	"fmt"
+	"fmt"beacon-chain/node/node.go
 	"net"
 	"sync"
 
@@ -20,6 +20,7 @@ import (
 	opfeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/operation"
 	statefeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/db"
+	lightservice "github.com/prysmaticlabs/prysm/beacon-chain/light"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/attestations"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/slashings"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/synccommittee"
@@ -33,6 +34,7 @@ import (
 	"github.com/prysmaticlabs/prysm/beacon-chain/rpc/eth/validator"
 	beaconv1alpha1 "github.com/prysmaticlabs/prysm/beacon-chain/rpc/prysm/v1alpha1/beacon"
 	debugv1alpha1 "github.com/prysmaticlabs/prysm/beacon-chain/rpc/prysm/v1alpha1/debug"
+	"github.com/prysmaticlabs/prysm/beacon-chain/rpc/prysm/v1alpha1/light"
 	nodev1alpha1 "github.com/prysmaticlabs/prysm/beacon-chain/rpc/prysm/v1alpha1/node"
 	validatorv1alpha1 "github.com/prysmaticlabs/prysm/beacon-chain/rpc/prysm/v1alpha1/validator"
 	"github.com/prysmaticlabs/prysm/beacon-chain/rpc/statefetcher"
@@ -108,6 +110,7 @@ type Config struct {
 	OperationNotifier       opfeed.Notifier
 	StateGen                *stategen.State
 	MaxMsgSize              int
+	LightClientService      *lightservice.Service
 }
 
 // NewService instantiates a new RPC service instance that will
@@ -279,6 +282,12 @@ func (s *Service) Start() {
 		VoluntaryExitsPool:      s.cfg.ExitPool,
 		V1Alpha1ValidatorServer: validatorServer,
 	}
+
+	lightClientServer := &light.Server{
+		LightClientService: s.cfg.LightClientService,
+	}
+
+	ethpbv1alpha1.RegisterLightClientServer(s.grpcServer, lightClientServer)
 	ethpbv1alpha1.RegisterNodeServer(s.grpcServer, nodeServer)
 	ethpbservice.RegisterBeaconNodeServer(s.grpcServer, nodeServerV1)
 	ethpbv1alpha1.RegisterHealthServer(s.grpcServer, nodeServer)

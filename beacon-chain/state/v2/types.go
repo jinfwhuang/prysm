@@ -49,6 +49,18 @@ type BeaconState struct {
 	sharedFieldReferences map[types.FieldIndex]*stateutil.Reference
 }
 
+func (b *BeaconState) GetState() *ethpb.BeaconStateAltair {
+	return b.state
+}
+
+func (b *BeaconState) SetState(state *ethpb.BeaconStateAltair) {
+	b.state = state
+}
+
+//func (b *BeaconState) GetState() *ethpb.BeaconStateAltair {
+//	return b.state
+//}
+
 // Field Aliases for values from the types package.
 const (
 	genesisTime                    = types.GenesisTime
