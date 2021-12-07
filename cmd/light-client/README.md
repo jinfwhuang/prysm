@@ -19,7 +19,7 @@ This is a new, independent program. All the codes are: cmd/light-client
 
 ```bash
 # Start light client
-go run -v ./cmd/lightclient/ \
+go run -v ./cmd/light-client/ \
 --full-node-server-endpoint=127.0.0.1:4000 \
 --grpc-port=4001 \
 --data-dir=../prysm-data/lightnode \
