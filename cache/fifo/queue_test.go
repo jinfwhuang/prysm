@@ -29,10 +29,4 @@ func TestNew(t *testing.T) {
 		peeks := q.Peek(i)
 		tmplog.Print(i, peeks)
 	}
-
-	//peeks := q.Peek(1)
-	//tmplog.Print(5, peeks)
-	//
-	//peeks = q.Peek(5)
-	//tmplog.Print(5, peeks)
 }

@@ -18,7 +18,7 @@ var (
 	checkpointBucket        = []byte("check-point")
 	powchainBucket          = []byte("powchain")
 	stateValidatorsBucket   = []byte("state-validators")
-	skipSyncBucket          = []byte("skip-sync3")
+	skipSyncBucket          = []byte("skip-sync-v1")
 
 	// Deprecated: This bucket was migrated in PR 6461. Do not use, except for migrations.
 	slotsHasObjectBucket = []byte("slots-has-objects")
