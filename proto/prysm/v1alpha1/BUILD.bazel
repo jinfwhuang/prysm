@@ -193,6 +193,7 @@ ssz_proto_files(
         "beacon_state.proto",
         "sync_committee.proto",
         "light_client.proto",
+        "light_update.proto",
     ],
     config = select({
         "//conditions:default": "mainnet",

@@ -140,5 +140,5 @@ message LightClientStore {
 
   uint64 previous_max_active_participants = 5;
   uint64 current_max_active_participants = 6;
-  repeated ethereum.eth.v1alpha1.LightClientUpdate best_valid_update = 7;
+  ethereum.eth.v1alpha1.LightClientUpdate best_valid_update = 7;
 }
