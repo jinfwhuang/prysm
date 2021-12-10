@@ -1,5 +1,6 @@
 package light
 
+import "C"
 import (
 	"context"
 	"encoding/base64"
@@ -8,6 +9,7 @@ import (
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/feed"
 	statefeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state"
+	statev1 "github.com/prysmaticlabs/prysm/beacon-chain/state/v1"
 	statev2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
 	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
 	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
@@ -35,7 +37,7 @@ func (s *Service) GetChainHeadAndState(ctx context.Context) (block.SignedBeaconB
 	return head, st, nil
 }
 
-func (s *Service) subscribeHeadEvent(ctx context.Context) {
+func (s *Service) subscribeEvents(ctx context.Context) {
 	stateChan := make(chan *feed.Event, 1)
 	sub := s.cfg.StateNotifier.StateFeed().Subscribe(stateChan)
 	defer sub.Unsubscribe()
@@ -73,6 +75,10 @@ func (s *Service) processHeadEvent(ctx context.Context, block block.SignedBeacon
 	if err != nil {
 		return err
 	}
+	if skipSyncUpdate.CurrentSyncCommittee == nil {
+		panic("dfdfdfdf")
+	}
+
 	skipSyncUpdate = s.bestSkipSyncUpdate(ctx, skipSyncUpdate)
 	update := ToLightClientUpdate(skipSyncUpdate)
 
@@ -83,8 +89,8 @@ func (s *Service) processHeadEvent(ctx context.Context, block block.SignedBeacon
 	// DEBUG
 	currentSyncCommRoot, err := skipSyncUpdate.CurrentSyncCommittee.HashTreeRoot()
 	nextSyncCommRoot, err := skipSyncUpdate.NextSyncCommittee.HashTreeRoot()
-	tmplog.Println("Current:", base64.StdEncoding.EncodeToString(currentSyncCommRoot[:]))
-	tmplog.Println("Next:", base64.StdEncoding.EncodeToString(nextSyncCommRoot[:]))
+	tmplog.Println("Current :", base64.StdEncoding.EncodeToString(currentSyncCommRoot[:]))
+	tmplog.Println("Next    :", base64.StdEncoding.EncodeToString(nextSyncCommRoot[:]))
 
 	return nil
 }
@@ -104,8 +110,8 @@ func (s *Service) processFinalizedEvent(ctx context.Context, block block.SignedB
 	// DEBUG
 	currentSyncCommRoot, err := skipSyncUpdate.CurrentSyncCommittee.HashTreeRoot()
 	nextSyncCommRoot, err := skipSyncUpdate.NextSyncCommittee.HashTreeRoot()
-	tmplog.Println("Current:", base64.StdEncoding.EncodeToString(currentSyncCommRoot[:]))
-	tmplog.Println("Next:", base64.StdEncoding.EncodeToString(nextSyncCommRoot[:]))
+	tmplog.Println("Current :", base64.StdEncoding.EncodeToString(currentSyncCommRoot[:]))
+	tmplog.Println("Next    :", base64.StdEncoding.EncodeToString(nextSyncCommRoot[:]))
 
 	return nil
 }
@@ -117,9 +123,12 @@ func (s *Service) bestSkipSyncUpdate(ctx context.Context, newUpdate *ethpb.SkipS
 		panic(err)
 	}
 	update, err := s.GetSkipSyncUpdate(ctx, bytesutil.ToBytes32(key[:]))
-	if err != nil {
+	if err != nil || update == nil {
 		return newUpdate
 	}
+
+	tmplog.Println(update.SyncCommitteeBits)
+	tmplog.Println(newUpdate.SyncCommitteeBits)
 
 	oldParticipation := numOfSetBits(update.SyncCommitteeBits)
 	newParticipation := numOfSetBits(newUpdate.SyncCommitteeBits)
@@ -146,9 +155,10 @@ func numOfSetBits(b []byte) int {
 			countZero += 1
 		}
 	}
-	if count+countZero != 512 { // TODO: Hack
-		panic("bit field is not 512")
-	}
+	//if count+countZero != 512 { // TODO: Hack
+	//	tmplog.Println("bit count", count+countZero)
+	//	panic("bit field is not 512")
+	//}
 
 	return count
 }
@@ -158,6 +168,17 @@ func (s *Service) getNonFinalizedSkipSyncUpdate(ctx context.Context, block block
 	if err != nil {
 		return nil, err
 	}
+
+	switch v := state.(type) {
+	case *statev1.BeaconState:
+		return nil, fmt.Errorf("wrong type: interface conversion: state.BeaconState is *v1.BeaconState, not *v2.BeaconState")
+	case *statev2.BeaconState:
+		// nothing
+	default:
+		tmplog.Println("unknown type")
+		tmplog.Println(v)
+		return nil, fmt.Errorf("unknown type %s", v)
+	}
 	zState := ztype.FromBeaconState(state.(*statev2.BeaconState))
 
 	syncAgg, err := block.Block().Body().SyncAggregate()
@@ -165,7 +186,7 @@ func (s *Service) getNonFinalizedSkipSyncUpdate(ctx context.Context, block block
 		return nil, err
 	}
 
-	currentComm, err := state.NextSyncCommittee()
+	currentComm, err := state.CurrentSyncCommittee()
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +241,7 @@ func (s *Service) getFinalizedSkipSyncUpdate(ctx context.Context, block block.Si
 
 	// Committee information refers to finalize_state
 	finalizedState, err := s.cfg.Database.State(ctx, bytesutil.ToBytes32(fCheckpoint.Root))
-	if err != nil {
+	if err != nil || finalizedState == nil {
 		return nil, err
 	}
 	zFinalizedState := ztype.FromBeaconState(finalizedState.(*statev2.BeaconState))

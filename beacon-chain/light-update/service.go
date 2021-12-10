@@ -77,14 +77,12 @@ func (s *Service) run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancelFunc = cancel
 
-	// Initialize the service from finalized (state, block) data.
-	log.Info("Initializing from finalized data")
-	if err := s.initializeFromFinalizedData(ctx); err != nil {
-		log.Fatal(err)
-	}
+	// Initialize the service.
+	log.Info("Initializing light-update service")
+	s.initializeFromHead(ctx)
 
 	log.Info("Start listening for events that will update light client related queue and db")
-	go s.subscribeHeadEvent(ctx)
+	go s.subscribeEvents(ctx)
 }
 
 func (s *Service) finalizedBlockOrGenesis(ctx context.Context, cpt *ethpb.Checkpoint) (block2.SignedBeaconBlock, error) {
@@ -111,22 +109,15 @@ func (s *Service) finalizedStateOrGenesis(ctx context.Context, cpt *ethpb.Checkp
 	return st, nil
 }
 
-func (s *Service) initializeFromFinalizedData(ctx context.Context) error {
-	cpt, err := s.cfg.Database.FinalizedCheckpoint(ctx)
+func (s *Service) initializeFromHead(ctx context.Context) {
+	head, beaconState, err := s.GetChainHeadAndState(ctx)
 	if err != nil {
-		return err
-	}
-	finalizedBlock, err := s.finalizedBlockOrGenesis(ctx, cpt)
-	if err != nil {
-		return err
-	}
-	finalizedState, err := s.finalizedStateOrGenesis(ctx, cpt)
-	if err != nil {
-		return err
+		panic(err)
 	}
 
-	//s.onFinalizedCheckpoint(ctx, finalizedBlock, finalizedState)
-	s.maintainQueueLightClientUpdates(ctx, finalizedBlock, finalizedState)
+	err = s.processHeadEvent(ctx, head, beaconState)
+	if err != nil {
+		tmplog.Println(err)
+	}
 
-	return nil
 }

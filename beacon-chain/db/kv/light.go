@@ -7,6 +7,7 @@ import (
 	"fmt"
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	bolt "go.etcd.io/bbolt"
+	"google.golang.org/protobuf/proto"
 	tmplog "log"
 )
 
@@ -38,13 +39,14 @@ func (s *Store) GetSkipSyncUpdate(ctx context.Context, key [32]byte) (*ethpb.Ski
 	}
 
 	update := &ethpb.SkipSyncUpdate{}
-	update.UnmarshalSSZ(value)
+	proto.Unmarshal(value, update)
+	//update.UnmarshalSSZ(value)
 	return update, nil
 }
 
 func (s *Store) SaveSkipSyncUpdate(ctx context.Context, update *ethpb.SkipSyncUpdate) error {
 	key, _ := update.CurrentSyncCommittee.HashTreeRoot()
-	value, _ := update.MarshalSSZ()
+	value, _ := proto.Marshal(update)
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(skipSyncBucket)
 		if err := bucket.Put(key[:], value); err != nil {

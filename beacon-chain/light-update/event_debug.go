@@ -74,7 +74,7 @@ func saveSsz(block block.BeaconBlock, ztypeState *ztype.ZtypBeaconStateAltair, f
 
 func verifyMerkleFinalityHeader(update *ethpb.LightClientUpdate) bool {
 	gIndex := ztype.CalculateGIndex(ztype.BeaconStateAltairType, 20, 1) // next_sync_committee  23
-	root := update.Header.StateRoot
+	root := update.AttestedHeader.StateRoot
 	leaf, err := update.FinalityHeader.HashTreeRoot() // ??? Is this hashroot correct? fastszz issue?  TODO: jin
 	if err != nil {
 		tmplog.Println(err)
@@ -86,7 +86,7 @@ func verifyMerkleFinalityHeader(update *ethpb.LightClientUpdate) bool {
 
 func verifyMerkleNextSyncComm(update *ethpb.LightClientUpdate) bool {
 	gIndex := ztype.CalculateGIndex(ztype.BeaconStateAltairType, 23) // next_sync_committee  23
-	root := update.Header.StateRoot
+	root := update.AttestedHeader.StateRoot
 	leaf, err := update.NextSyncCommittee.HashTreeRoot() // ??? Is this hashroot correct? fastszz issue?  TODO: jin
 
 	if err != nil {
@@ -196,7 +196,7 @@ func testVerifyNexSynComm(update *ethpb.LightClientUpdate, ztypeState ztype.Ztyp
 	ver := verifyMerkleNextSyncComm(update)
 	tmplog.Println("ver", ver)
 
-	root1 := bytesutil.ToBytes32(update.Header.StateRoot)
+	root1 := bytesutil.ToBytes32(update.AttestedHeader.StateRoot)
 	leaf1, _ := update.NextSyncCommittee.HashTreeRoot() // ??? Is this hashroot correct? fastszz issue?  TODO: jin
 	tmplog.Println("using update", ztype.Verify(root1, gIndex, leaf1, update.NextSyncCommitteeBranch))
 

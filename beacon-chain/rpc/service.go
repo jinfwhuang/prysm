@@ -287,7 +287,7 @@ func (s *Service) Start() {
 		LightUpdateService: s.cfg.LightUpdateService,
 	}
 
-	ethpbv1alpha1.RegisterLightClientServer(s.grpcServer, lightUpdateServer)
+	ethpbv1alpha1.RegisterLightUpdateServer(s.grpcServer, lightUpdateServer)
 	ethpbv1alpha1.RegisterNodeServer(s.grpcServer, nodeServer)
 	ethpbservice.RegisterBeaconNodeServer(s.grpcServer, nodeServerV1)
 	ethpbv1alpha1.RegisterHealthServer(s.grpcServer, nodeServer)
