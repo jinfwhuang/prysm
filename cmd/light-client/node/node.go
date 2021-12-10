@@ -2,38 +2,19 @@ package node
 
 import (
 	"context"
-	lightutil "github.com/prysmaticlabs/prysm/cmd/light-client/util"
-	//"github.com/prysmaticlabs/prysm/cmd/lightclient"
 	lightrpc "github.com/prysmaticlabs/prysm/cmd/light-client/rpc"
 	lightsync "github.com/prysmaticlabs/prysm/cmd/light-client/sync"
+	lightutil "github.com/prysmaticlabs/prysm/cmd/light-client/util"
 	"github.com/prysmaticlabs/prysm/runtime"
 	"github.com/prysmaticlabs/prysm/runtime/debug"
+	"github.com/urfave/cli/v2"
 	tmplog "log"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/urfave/cli/v2"
 )
-
-/**
-skip      Current: UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=
-skip         Next: rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=
-
-skip     Current: rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=
-skip        Next: rR02jjGZACSvzADI9boK4qXf8Aa4YGhMsdM4Jk6cs0c=
-
-update      Next: rR02jjGZACSvzADI9boK4qXf8Aa4YGhMsdM4Jk6cs0c=
-
-
---full-node-server-endpoint=127.0.0.1:4000 \
---grpc-port=4001 \
---grpc-gateway-port=3501 \
---datadir=../prysm-data/lightnode/ \
---sync-mode=quorum \
-*/
 
 var (
 	FullNodeServerEndpoint = &cli.StringFlag{
@@ -79,8 +60,9 @@ var (
 	TrustedCurrentCommitteeRoot = &cli.StringFlag{
 		Name:  "trusted-current-committee-root",
 		Usage: "In base64 string",
-		Value: "UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=", // roughly 2021-12-02
+		//Value: "UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=", // roughly 2021-12-02
 		//Value: "rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=" // roughly 2021-12-03
+		Value: "Kmm8RWMsAvIvDOjnuGNqVNKLNf5opImvXyfnL5ebDoo=", // roughly 2021-12-09
 	}
 )
 
