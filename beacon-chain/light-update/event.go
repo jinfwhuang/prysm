@@ -21,7 +21,7 @@ import (
 	tmplog "log"
 )
 
-func (s *Service) GetChainHeadAndState(ctx context.Context) (block.SignedBeaconBlock, state.BeaconState, error) {
+func (s *Service) _GetChainHeadAndState(ctx context.Context) (block.SignedBeaconBlock, state.BeaconState, error) {
 	root, err := s.cfg.HeadFetcher.HeadRoot(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -34,7 +34,7 @@ func (s *Service) GetChainHeadAndState(ctx context.Context) (block.SignedBeaconB
 		return nil, nil, fmt.Errorf("head is nil: blockRoot=%s", base64.StdEncoding.EncodeToString(root))
 	}
 
-	st, err := s.cfg.Database.State(ctx, bytesutil.ToBytes32(root))
+	st, err := s.cfg.StateGen.StateByRoot(ctx, bytesutil.ToBytes32(root))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -46,6 +46,17 @@ func (s *Service) GetChainHeadAndState(ctx context.Context) (block.SignedBeaconB
 	return blk, st, nil
 }
 
+func (s *Service) GetHeadState(ctx context.Context) (state.BeaconState, error) {
+	st, err := s.cfg.HeadFetcher.HeadState(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if st == nil || st.IsNil() {
+		return nil, fmt.Errorf("cannot get a heade state")
+	}
+	return st, nil
+}
+
 func (s *Service) subscribeEvents(ctx context.Context) {
 	stateChan := make(chan *feed.Event, 1)
 	sub := s.cfg.StateNotifier.StateFeed().Subscribe(stateChan)
@@ -54,48 +65,16 @@ func (s *Service) subscribeEvents(ctx context.Context) {
 		select {
 		case ev := <-stateChan:
 			if ev.Type == statefeed.NewHead {
-				tmplog.Println("head data")
 				headEvent, ok := ev.Data.(*ethpbv1.EventHead)
 				if !ok {
-					panic(ok)
+					log.Error("cannot convert data to EventHead")
+					log.Error(ok)
+					continue
 				}
 				root := headEvent.Block
+				s.processHeadEvent(ctx, root)
 
-				//ev.Data
-				//&ethpbv1.EventHead{
-				//	Slot:                      newHeadSlot,
-				//	Block:                     newHeadRoot,
-				//	State:                     newHeadStateRoot,
-				//	EpochTransition:           slots.IsEpochStart(newHeadSlot),
-				//	PreviousDutyDependentRoot: previousDutyDependentRoot,
-				//	CurrentDutyDependentRoot:  currentDutyDependentRoot,
-				//}
-
-				//root, err := s.cfg.HeadFetcher.HeadRoot(ctx)
-				//if err != nil {
-				//	log.Error(err)
-				//	continue
-				//}
-				//head, err := s.cfg.HeadFetcher.HeadBlock(ctx)
-				////_head, err := head.Block
-				//headRoot, err := head.Block().HashTreeRoot()
-				//tmplog.Println(root)
-				//tmplog.Println(headRoot)
-				//if err != nil {
-				//	log.Error(err)
-				//	continue
-				//}
-				s.learnState(ctx, root[:])
-
-				//head, beaconState, err := s.GetChainHeadAndState(ctx)
-				//if err != nil {
-				//	log.Error(err)
-				//	continue
-				//}
-				//if err := s.processHeadEvent(ctx, head, beaconState); err != nil {
-				//	log.Error(err)
-				//	continue
-				//}
+				//s.learnState(ctx, root[:])
 
 			} else if ev.Type == statefeed.FinalizedCheckpoint {
 				tmplog.Println("=================")
@@ -108,20 +87,8 @@ func (s *Service) subscribeEvents(ctx context.Context) {
 					log.Error(err)
 					continue
 				}
-				s.learnState(ctx, root)
-
-				////head, beaconState, err := s.GetChainHeadAndState(ctx)
-				//block, state, err := s.parseFinalizedEvent(ctx, ev.Data)
-				//if err != nil {
-				//	log.Error(err)
-				//	continue
-				//}
-				//
-				//if err := s.processFinalizedEvent(ctx, block, state); err != nil {
-				//	tmplog.Println(err)
-				//	log.Error(err)
-				//	continue
-				//}
+				//s.learnState(ctx, root)
+				s.processFinalizedEvent(ctx, root)
 			}
 		case <-sub.Err():
 			return
@@ -131,13 +98,10 @@ func (s *Service) subscribeEvents(ctx context.Context) {
 	}
 }
 
-func (s *Service) processHeadEvent(ctx context.Context, block block.SignedBeaconBlock, state state.BeaconState) error {
-	skipSyncUpdate, err := s.getNonFinalizedSkipSyncUpdate(ctx, block, state)
+func (s *Service) processHeadEvent(ctx context.Context, root []byte) error {
+	skipSyncUpdate, err := s.getNonFinalizedSkipSyncUpdate(ctx, root)
 	if err != nil {
 		return err
-	}
-	if skipSyncUpdate.CurrentSyncCommittee == nil {
-		panic("dfdfdfdf")
 	}
 
 	skipSyncUpdate = s.bestSkipSyncUpdate(ctx, skipSyncUpdate)
@@ -156,10 +120,8 @@ func (s *Service) processHeadEvent(ctx context.Context, block block.SignedBeacon
 	return nil
 }
 
-func (s *Service) processFinalizedEvent(ctx context.Context, block block.SignedBeaconBlock, state state.BeaconState) error {
-	tmplog.Println("processFinalizedEvent")
-	skipSyncUpdate, err := s.getFinalizedSkipSyncUpdate(ctx, block, state)
-	tmplog.Println("created new update, ", skipSyncUpdate)
+func (s *Service) processFinalizedEvent(ctx context.Context, root []byte) error {
+	skipSyncUpdate, err := s.getFinalizedSkipSyncUpdate(ctx, root)
 	if err != nil {
 		return err
 	}
@@ -226,44 +188,51 @@ func numOfSetBits(b []byte) int {
 			countZero += 1
 		}
 	}
-	//if count+countZero != 512 { // TODO: Hack
-	//	tmplog.Println("bit count", count+countZero)
-	//	panic("bit field is not 512")
-	//}
+	if count+countZero != 512 { // TODO: Hack
+		tmplog.Println("bit count", count+countZero)
+		panic("bit field is not 512")
+	}
 
 	return count
 }
 
-func (s *Service) getNonFinalizedSkipSyncUpdate(ctx context.Context, block block.SignedBeaconBlock, state state.BeaconState) (*ethpb.SkipSyncUpdate, error) {
-	attestedHeader, err := block.Header()
+func (s *Service) getNonFinalizedSkipSyncUpdate(ctx context.Context, root []byte) (*ethpb.SkipSyncUpdate, error) {
+	blk, err := s.getBlock(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	st, err := s.getState(ctx, root)
 	if err != nil {
 		return nil, err
 	}
 
-	switch v := state.(type) {
+	attestedHeader, err := blk.Header()
+	if err != nil {
+		return nil, err
+	}
+
+	switch v := st.(type) {
 	case *statev1.BeaconState:
 		return nil, fmt.Errorf("wrong type: interface conversion: state.BeaconState is *v1.BeaconState, not *v2.BeaconState")
 	case *statev2.BeaconState:
 		// nothing
 	default:
-		tmplog.Println("unknown type")
-		tmplog.Println(v)
-		return nil, fmt.Errorf("unknown type %s", v)
+		return nil, fmt.Errorf("unkown type %s", v)
 	}
-	zState := ztype.FromBeaconState(state.(*statev2.BeaconState))
+	zState := ztype.FromBeaconState(st.(*statev2.BeaconState))
 
-	syncAgg, err := block.Block().Body().SyncAggregate()
+	syncAgg, err := blk.Block().Body().SyncAggregate()
 	if err != nil {
 		return nil, err
 	}
 
-	currentComm, err := state.CurrentSyncCommittee()
+	currentComm, err := st.CurrentSyncCommittee()
 	if err != nil {
 		return nil, err
 	}
 	currentCommBranch := zState.GetBranch(zState.GetGIndex(22))
 
-	nextComm, err := state.NextSyncCommittee()
+	nextComm, err := st.NextSyncCommittee()
 	if err != nil {
 		return nil, err
 	}
@@ -275,24 +244,31 @@ func (s *Service) getNonFinalizedSkipSyncUpdate(ctx context.Context, block block
 		CurrentSyncCommitteeBranch: currentCommBranch,
 		NextSyncCommittee:          nextComm,
 		NextSyncCommitteeBranch:    nextCommBranch,
-		FinalityHeader:             &ethpb.BeaconBlockHeader{},
+		FinalityHeader:             &ethpb.BeaconBlockHeader{}, // Empty
 		FinalityBranch:             [][]byte{},
 		SyncCommitteeBits:          syncAgg.SyncCommitteeBits,
 		SyncCommitteeSignature:     syncAgg.SyncCommitteeSignature,
-		ForkVersion:                state.Fork().CurrentVersion,
+		ForkVersion:                st.Fork().CurrentVersion,
 	}
 
 	return update, nil
 }
 
-func (s *Service) getFinalizedSkipSyncUpdate(ctx context.Context, block block.SignedBeaconBlock, state state.BeaconState) (*ethpb.SkipSyncUpdate, error) {
-	// Based on state
-	attestedHeader, err := block.Header()
+func (s *Service) getFinalizedSkipSyncUpdate(ctx context.Context, root []byte) (*ethpb.SkipSyncUpdate, error) {
+	blk, err := s.getBlock(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	st, err := s.getState(ctx, root)
 	if err != nil {
 		return nil, err
 	}
 
-	fCheckpoint := state.FinalizedCheckpoint()
+	attestedHeader, err := blk.Header()
+	if err != nil {
+		return nil, err
+	}
+	fCheckpoint := st.FinalizedCheckpoint()
 	finalityBlock, err := s.cfg.Database.Block(ctx, bytesutil.ToBytes32(fCheckpoint.Root))
 	if err != nil {
 		return nil, err
@@ -300,38 +276,37 @@ func (s *Service) getFinalizedSkipSyncUpdate(ctx context.Context, block block.Si
 	if finalityBlock == nil {
 		return nil, fmt.Errorf("cannot find block with root: %s", base64.StdEncoding.EncodeToString(fCheckpoint.Root))
 	}
-	tmplog.Println("found finality block", finalityBlock)
-	tmplog.Println("bytesutil.ToBytes32(fCheckpoint.Root)", base64.StdEncoding.EncodeToString(fCheckpoint.Root))
+	//tmplog.Println("found finality block", finalityBlock)
+	//tmplog.Println("bytesutil.ToBytes32(fCheckpoint.Root)", base64.StdEncoding.EncodeToString(fCheckpoint.Root))
 	signedFinalityHeader, err := finalityBlock.Header()
 	finalityHeader := signedFinalityHeader.Header
 	if err != nil {
 		return nil, err
 	}
-	zState := ztype.FromBeaconState(state.(*statev2.BeaconState))
+	zState := ztype.FromBeaconState(st.(*statev2.BeaconState))
 	finalityCheckpointRootBranch := zState.GetBranch(zState.GetGIndex(20, 1))
 
-	syncAgg, err := block.Block().Body().SyncAggregate()
+	syncAgg, err := blk.Block().Body().SyncAggregate()
 	if err != nil {
 		return nil, err
 	}
 
 	// Committee information refers to finalize_state
-	finalizedState, err := s.cfg.Database.State(ctx, bytesutil.ToBytes32(fCheckpoint.Root))
+	fSt, err := s.cfg.StateGen.StateByRoot(ctx, bytesutil.ToBytes32(fCheckpoint.Root))
 	if err != nil {
 		return nil, err
 	}
-	if finalizedState == nil {
+	if fSt == nil {
 		return nil, fmt.Errorf("cannot find state with root: %s", base64.StdEncoding.EncodeToString(fCheckpoint.Root))
 	}
-	tmplog.Println("found finality state", finalityBlock)
-	zFinalizedState := ztype.FromBeaconState(finalizedState.(*statev2.BeaconState))
-	currentCom, err := finalizedState.CurrentSyncCommittee()
+	zFinalizedState := ztype.FromBeaconState(fSt.(*statev2.BeaconState))
+	currentCom, err := fSt.CurrentSyncCommittee()
 	if err != nil {
 		return nil, err
 	}
 	currentSyncCommitteeBranch := zFinalizedState.GetBranch(zFinalizedState.GetGIndex(22))
 
-	nextCom, err := finalizedState.NextSyncCommittee()
+	nextCom, err := fSt.NextSyncCommittee()
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +322,7 @@ func (s *Service) getFinalizedSkipSyncUpdate(ctx context.Context, block block.Si
 		FinalityBranch:             finalityCheckpointRootBranch,
 		SyncCommitteeBits:          syncAgg.SyncCommitteeBits,
 		SyncCommitteeSignature:     syncAgg.SyncCommitteeSignature,
-		ForkVersion:                state.Fork().CurrentVersion,
+		ForkVersion:                st.Fork().CurrentVersion,
 	}
 
 	return skipSyncUpdate, nil

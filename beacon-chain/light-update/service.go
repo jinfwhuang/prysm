@@ -17,7 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	tmplog "log"
 	"sync"
-	"time"
 )
 
 func init() {
@@ -69,11 +68,11 @@ func (s *Service) GetSkipSyncUpdate(ctx context.Context, key [32]byte) (*ethpb.S
 }
 
 func (s *Service) GetCurrentSyncComm(ctx context.Context) (*ethpb.SyncCommittee, error) {
-	_, state, err := s.GetChainHeadAndState(ctx)
+	st, err := s.GetHeadState(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return state.CurrentSyncCommittee()
+	return st.CurrentSyncCommittee()
 }
 
 func (s *Service) run() {
@@ -82,8 +81,6 @@ func (s *Service) run() {
 
 	s.waitForChainInitialization(ctx)
 	log.Info("Chain is initialized")
-
-	time.Sleep(time.Second * 10)
 
 	// Initialize the service.
 	log.Info("Initializing light-update service")
@@ -107,103 +104,28 @@ func (s *Service) finalizedBlockOrGenesis(ctx context.Context, cpt *ethpb.Checkp
 }
 
 func (s *Service) initializeFromHead(ctx context.Context) {
-	_blk, st, err := s.GetChainHeadAndState(ctx)
+	//_blk, st, err := s.GetChainHeadAndState(ctx)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//blk := _blk.Block()
+	//if err != nil {
+	//	panic(err)
+	//}
+	//root, err := blk.HashTreeRoot()
+
+	root, err := s.cfg.HeadFetcher.HeadRoot(ctx)
 	if err != nil {
 		panic(err)
 	}
-	blk := _blk.Block()
+
+	////ckp := st.FinalizedCheckpoint()
+	//s.learnState(ctx, root[:])
+	//
+	err = s.processFinalizedEvent(ctx, root)
 	if err != nil {
 		panic(err)
 	}
-	root, err := blk.HashTreeRoot()
-	//ckp := st.FinalizedCheckpoint()
-	s.learnState(ctx, root[:])
-
-	tmplog.Println("condition", Equal(bytesutil.ToBytes32(st.FinalizedCheckpoint().Root), [32]byte{}))
-	if Equal(bytesutil.ToBytes32(st.FinalizedCheckpoint().Root), [32]byte{}) {
-		tmplog.Println(st.FinalizedCheckpoint())
-		tmplog.Println(st.BlockRoots())
-		tmplog.Println(st.CurrentJustifiedCheckpoint())
-	}
-
-	//count := 0
-	//for Equal(bytesutil.ToBytes32(st.FinalizedCheckpoint().Root), [32]byte{}) { // until we find a valid checkpoint
-	//	// Find a previous root
-	//	root := blk.ParentRoot()
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	tmplog.Println("working with root", root)
-	//
-	//	_blk, err := s.cfg.Database.Block(ctx, bytesutil.ToBytes32(root))
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	if blk == nil {
-	//		//panic("cannot find s")
-	//		tmplog.Println("cannot find blk, ", root)
-	//		continue
-	//	}
-	//	blk = _blk.Block()
-	//	st, err = s.cfg.Database.State(ctx, bytesutil.ToBytes32(root))
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	if st == nil {
-	//		tmplog.Println("cannot find state, ", root)
-	//		continue
-	//	}
-	//
-	//	learnState(root, blk, st)
-	//	tmplog.Println(count)
-	//	count += 1
-	//	time.Sleep(time.Second * 1)
-	//}
-	//tmplog.Println("finalized header", finalziedHead)
-	//tmplog.Println("finalized state", finalizedState)
-
-	//if err != nil || block.IsNil() || state.IsNil() {
-	//	tmplog.Println(block, state, err)
-	//	return
-	//}
-
-	//cpt, err := s.cfg.Database.FinalizedCheckpoint(ctx)
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	//finalizedBlock, err := s.cfg.Database.Block(ctx, bytesutil.ToBytes32(finalizedHeaderRoot))
-	//if err != nil {
-	//	panic(err)
-	//}
-	//if finalizedBlock == nil || finalizedBlock.IsNil() {
-	//	err = fmt.Errorf("cannot find block with root: %s", base64.StdEncoding.EncodeToString(finalizedHeaderRoot))
-	//	panic(err)
-	//}
-	//
-	//finalizedState, err := s.cfg.Database.State(ctx, bytesutil.ToBytes32(finalizedHeaderRoot))
-	//if err != nil {
-	//	panic(err)
-	//}
-	//if finalizedState == nil || finalizedState.IsNil() {
-	//	err = fmt.Errorf("cannot find state with root: %s", base64.StdEncoding.EncodeToString(finalizedHeaderRoot))
-	//	panic(err)
-	//}
-	//
-	////err = s.processHeadEvent(ctx, block, state)
-	//tmplog.Println(block.Header())
-	//tmplog.Println(state.FinalizedCheckpoint())
-
-	////panic("fff")
-	//err = s.processFinalizedEvent(ctx, block, state)
-	//
-	////err = s.processFinalizedEvent(ctx, block, state)
-	//
-	//if err != nil {
-	//	tmplog.Println(err)
-	//}
-	//panic("fffdfdfd")
-
 }
 
 func printBlk(blk block.SignedBeaconBlock) {
