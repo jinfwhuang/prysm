@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
 	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
+	v1 "github.com/prysmaticlabs/prysm/proto/eth/v1"
 
 	//vv1 "github.com/prysmaticlabs/prysm/beacon-chain/state/v1"
 	statev2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
@@ -19,6 +21,7 @@ import (
 	"github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1/block"
 
 	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 func hexStr(b []byte) string {
@@ -209,4 +212,109 @@ func testVerifyNexSynComm(update *ethpb.LightClientUpdate, ztypeState ztype.Ztyp
 	tmplog.Println("leaf1", base64.StdEncoding.EncodeToString(leaf1[:]))
 	tmplog.Println("leaf2", base64.StdEncoding.EncodeToString(leaf2[:]))
 
+}
+
+func (s *Service) learnState(ctx context.Context, root []byte) {
+	tmplog.Println("-------learning-----------")
+	tmplog.Println("root", base64.StdEncoding.EncodeToString(root))
+	blk, err := s.getBlock(ctx, root)
+	if err != nil {
+		tmplog.Println(err)
+		log.Error(err)
+		return
+	}
+	//header, err := blk.Header()
+	//if err != nil {
+	//	tmplog.Println(err)
+	//	log.Error(err)
+	//	return
+	//}
+	blkRoot, err := blk.Block().HashTreeRoot()
+	if err != nil {
+		tmplog.Println(err)
+		log.Error(err)
+		return
+	}
+	tmplog.Println("block root", base64.StdEncoding.EncodeToString(blkRoot[:]))
+
+	st, err := s.getState(ctx, root)
+	if err != nil {
+		tmplog.Println(err)
+		log.Error(err)
+		return
+	}
+	stRoot, err := st.HashTreeRoot(context.Background())
+	if err != nil {
+		tmplog.Println(err)
+		log.Error(err)
+		return
+	}
+	tmplog.Println("state root", base64.StdEncoding.EncodeToString(stRoot[:]))
+	tmplog.Println("checkpoint root", base64.StdEncoding.EncodeToString(st.FinalizedCheckpoint().Root))
+	tmplog.Println("state checkpoint", st.FinalizedCheckpoint())
+
+	fRoot := st.FinalizedCheckpoint().Root
+
+	fBlk, err := s.getBlock(ctx, fRoot)
+	if err != nil {
+		tmplog.Println(err)
+		log.Error(err)
+		return
+	}
+	tmplog.Println("---")
+	tmplog.Println("f root", base64.StdEncoding.EncodeToString(fRoot))
+	tmplog.Println("f block", fBlk)
+
+	fSt, err := s.getState(ctx, fRoot)
+	if err != nil {
+		tmplog.Println(err)
+		log.Error(err)
+		return
+	}
+	fStRoot, err := fSt.HashTreeRoot(context.Background())
+	if err != nil {
+		tmplog.Println(err)
+		log.Error(err)
+		return
+	}
+	tmplog.Println("f state root", base64.StdEncoding.EncodeToString(fStRoot[:]))
+	tmplog.Println("----------------")
+}
+
+func (s *Service) _GetChainHeadAndState(ctx context.Context) (block.SignedBeaconBlock, state.BeaconState, error) {
+	root, err := s.cfg.HeadFetcher.HeadRoot(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	blk, err := s.cfg.Database.Block(ctx, bytesutil.ToBytes32(root))
+	if err != nil {
+		return nil, nil, err
+	}
+	if blk == nil || blk.IsNil() {
+		return nil, nil, fmt.Errorf("head is nil: blockRoot=%s", base64.StdEncoding.EncodeToString(root))
+	}
+
+	st, err := s.cfg.StateGen.StateByRoot(ctx, bytesutil.ToBytes32(root))
+	if err != nil {
+		return nil, nil, err
+	}
+	if st == nil || st.IsNil() {
+		tmplog.Println(s.cfg.Database.HasState(ctx, bytesutil.ToBytes32(root)))
+		return nil, nil, fmt.Errorf("head state is nil: blockRoot=%s", base64.StdEncoding.EncodeToString(root))
+	}
+
+	return blk, st, nil
+}
+
+func (s *Service) parseFinalizedEvent(ctx context.Context, eventData interface{}) (block.SignedBeaconBlock, state.BeaconState, error) {
+	finalizedCheckpoint, ok := eventData.(*v1.EventFinalizedCheckpoint)
+	if !ok {
+		return nil, nil, fmt.Errorf("expected finalized checkpoint event")
+	}
+	blk, err := s.getBlock(ctx, finalizedCheckpoint.Block)
+	if err != nil {
+		return nil, nil, err
+	}
+	st, err := s.getState(ctx, finalizedCheckpoint.Block)
+	return blk, st, nil
 }

@@ -8,7 +8,6 @@ import (
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
-	tmplog "log"
 )
 
 func (s *Store) GetSkipSyncUpdate(ctx context.Context, key [32]byte) (*ethpb.SkipSyncUpdate, error) {
@@ -39,14 +38,14 @@ func (s *Store) GetSkipSyncUpdate(ctx context.Context, key [32]byte) (*ethpb.Ski
 	}
 
 	update := &ethpb.SkipSyncUpdate{}
-	proto.Unmarshal(value, update)
+	proto.Unmarshal(value, update) // TODO: decide if we use protobuf or ssz
 	//update.UnmarshalSSZ(value)
 	return update, nil
 }
 
 func (s *Store) SaveSkipSyncUpdate(ctx context.Context, update *ethpb.SkipSyncUpdate) error {
 	key, _ := update.CurrentSyncCommittee.HashTreeRoot()
-	value, _ := proto.Marshal(update)
+	value, _ := proto.Marshal(update) // TODO: decide if we use protobuf or ssz
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(skipSyncBucket)
 		if err := bucket.Put(key[:], value); err != nil {
@@ -57,18 +56,5 @@ func (s *Store) SaveSkipSyncUpdate(ctx context.Context, update *ethpb.SkipSyncUp
 	if err != nil {
 		return err
 	}
-
-	emptyHeader := &ethpb.BeaconBlockHeader{}
-	tmplog.Println("attested header", update.AttestedHeader)
-	tmplog.Println("finality header", update.FinalityHeader)
-	tmplog.Println(update.FinalityHeader == emptyHeader)
-	tmplog.Println(proto.Equal(update.FinalityHeader, emptyHeader))
-	tmplog.Println(update.FinalityHeader == nil)
-	tmplog.Println("finality branch", update.FinalityBranch)
-	updateRoot, _ := update.HashTreeRoot()
-
-	tmplog.Println("key base64", base64.StdEncoding.EncodeToString(key[:]))
-	tmplog.Println("value base64, first 500 bytes", base64.StdEncoding.EncodeToString(value[0:500]))
-	tmplog.Println("skipSyncUpdate hash root", base64.StdEncoding.EncodeToString(updateRoot[:]))
 	return nil
 }

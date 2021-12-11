@@ -2,12 +2,10 @@ package light
 
 import (
 	"context"
-	"encoding/base64"
 	"github.com/prysmaticlabs/prysm/beacon-chain/blockchain"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/feed"
 	statefeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/db/iface"
-	"github.com/prysmaticlabs/prysm/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state/stategen"
 	syncSrv "github.com/prysmaticlabs/prysm/beacon-chain/sync"
 	"github.com/prysmaticlabs/prysm/cache/fifo"
@@ -20,7 +18,7 @@ import (
 )
 
 func init() {
-	tmplog.SetFlags(tmplog.Llongfile)
+	tmplog.SetFlags(tmplog.Llongfile) // TODO: hack
 }
 
 type Config struct {
@@ -64,7 +62,7 @@ func (s *Service) Status() error {
 }
 
 func (s *Service) GetSkipSyncUpdate(ctx context.Context, key [32]byte) (*ethpb.SkipSyncUpdate, error) {
-	return s.cfg.Database.GetSkipSyncUpdate(ctx, key)
+	return s.cfg.Database.GetSkipSyncUpdate(ctx, key) // TODO: Is there a better way to cache the data?
 }
 
 func (s *Service) GetCurrentSyncComm(ctx context.Context) (*ethpb.SyncCommittee, error) {
@@ -104,143 +102,14 @@ func (s *Service) finalizedBlockOrGenesis(ctx context.Context, cpt *ethpb.Checkp
 }
 
 func (s *Service) initializeFromHead(ctx context.Context) {
-	//_blk, st, err := s.GetChainHeadAndState(ctx)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//blk := _blk.Block()
-	//if err != nil {
-	//	panic(err)
-	//}
-	//root, err := blk.HashTreeRoot()
-
 	root, err := s.cfg.HeadFetcher.HeadRoot(ctx)
 	if err != nil {
 		panic(err)
 	}
-
-	////ckp := st.FinalizedCheckpoint()
-	//s.learnState(ctx, root[:])
-	//
 	err = s.processFinalizedEvent(ctx, root)
 	if err != nil {
 		panic(err)
 	}
-}
-
-func printBlk(blk block.SignedBeaconBlock) {
-	_header, err := blk.Header()
-	if err != nil {
-		panic(err)
-	}
-	header := _header.Header
-
-	blkRoot, err := header.HashTreeRoot()
-	if err != nil {
-		panic(err)
-	}
-	tmplog.Println("-------block-----------")
-	tmplog.Println(header)
-	tmplog.Println("blk root", blkRoot)
-	tmplog.Println("----------------")
-}
-
-func printState(st state.BeaconState) {
-	//blkRoot, err := state.LatestBlockHeader().HashTreeRoot()
-	//if err != nil {
-	//	panic(err)
-	//}
-	stRoot, err := st.HashTreeRoot(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-	tmplog.Println("-------state-----------")
-	tmplog.Println("state root", stRoot)
-	tmplog.Println("state checkpoint", st.FinalizedCheckpoint())
-	tmplog.Println("----------------")
-	//tmplog.Println("blk root", blkRoot)
-	//tmplog.Println("blk header", state.LatestBlockHeader())
-
-}
-
-func (s *Service) learnState(ctx context.Context, root []byte) {
-	tmplog.Println("-------learning-----------")
-	tmplog.Println("root", base64.StdEncoding.EncodeToString(root))
-	blk, err := s.getBlock(ctx, root)
-	if err != nil {
-		tmplog.Println(err)
-		log.Error(err)
-		return
-	}
-	//header, err := blk.Header()
-	//if err != nil {
-	//	tmplog.Println(err)
-	//	log.Error(err)
-	//	return
-	//}
-	blkRoot, err := blk.Block().HashTreeRoot()
-	if err != nil {
-		tmplog.Println(err)
-		log.Error(err)
-		return
-	}
-	tmplog.Println("block root", base64.StdEncoding.EncodeToString(blkRoot[:]))
-
-	st, err := s.getState(ctx, root)
-	if err != nil {
-		tmplog.Println(err)
-		log.Error(err)
-		return
-	}
-	stRoot, err := st.HashTreeRoot(context.Background())
-	if err != nil {
-		tmplog.Println(err)
-		log.Error(err)
-		return
-	}
-	tmplog.Println("state root", base64.StdEncoding.EncodeToString(stRoot[:]))
-	tmplog.Println("checkpoint root", base64.StdEncoding.EncodeToString(st.FinalizedCheckpoint().Root))
-	tmplog.Println("state checkpoint", st.FinalizedCheckpoint())
-
-	fRoot := st.FinalizedCheckpoint().Root
-
-	fBlk, err := s.getBlock(ctx, fRoot)
-	if err != nil {
-		tmplog.Println(err)
-		log.Error(err)
-		return
-	}
-	tmplog.Println("---")
-	tmplog.Println("f root", base64.StdEncoding.EncodeToString(fRoot))
-	tmplog.Println("f block", fBlk)
-
-	fSt, err := s.getState(ctx, fRoot)
-	if err != nil {
-		tmplog.Println(err)
-		log.Error(err)
-		return
-	}
-	fStRoot, err := fSt.HashTreeRoot(context.Background())
-	if err != nil {
-		tmplog.Println(err)
-		log.Error(err)
-		return
-	}
-	tmplog.Println("f state root", base64.StdEncoding.EncodeToString(fStRoot[:]))
-	tmplog.Println("----------------")
-}
-
-func Equal(a, b [32]byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, v := range a {
-		if v != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func (s *Service) waitForChainInitialization(ctx context.Context) {
@@ -277,4 +146,16 @@ func (s *Service) waitForChainInitialization(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func Equal(a, b [32]byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
 }
