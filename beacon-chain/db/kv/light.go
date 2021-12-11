@@ -58,7 +58,17 @@ func (s *Store) SaveSkipSyncUpdate(ctx context.Context, update *ethpb.SkipSyncUp
 		return err
 	}
 
+	emptyHeader := &ethpb.BeaconBlockHeader{}
+	tmplog.Println("attested header", update.AttestedHeader)
+	tmplog.Println("finality header", update.FinalityHeader)
+	tmplog.Println(update.FinalityHeader == emptyHeader)
+	tmplog.Println(proto.Equal(update.FinalityHeader, emptyHeader))
+	tmplog.Println(update.FinalityHeader == nil)
+	tmplog.Println("finality branch", update.FinalityBranch)
 	updateRoot, _ := update.HashTreeRoot()
-	tmplog.Println("key base64", base64.StdEncoding.EncodeToString(key[:]), "skipsyncupdate hash root", hex.EncodeToString(updateRoot[:]))
+
+	tmplog.Println("key base64", base64.StdEncoding.EncodeToString(key[:]))
+	tmplog.Println("value base64, first 500 bytes", base64.StdEncoding.EncodeToString(value[0:500]))
+	tmplog.Println("skipSyncUpdate hash root", base64.StdEncoding.EncodeToString(updateRoot[:]))
 	return nil
 }
