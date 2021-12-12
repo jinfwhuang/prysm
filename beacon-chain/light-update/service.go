@@ -147,15 +147,3 @@ func (s *Service) waitForChainInitialization(ctx context.Context) {
 		}
 	}
 }
-
-func Equal(a, b [32]byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, v := range a {
-		if v != b[i] {
-			return false
-		}
-	}
-	return true
-}
