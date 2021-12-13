@@ -63,7 +63,8 @@ var (
 		//Value: "UeSv92gwGs+DSk34NqOaCM1DaU9zyclQE6Tc9morK0M=", // roughly 2021-12-02
 		//Value: "rcWo3eE6KOLBLDQeahrXkdzxjWnE8qYHmL8HyNWv7b8=" // roughly 2021-12-03
 		//Value: "Kmm8RWMsAvIvDOjnuGNqVNKLNf5opImvXyfnL5ebDoo=", // roughly 2021-12-09
-		Value: "susgL7vNce2IqAq6HWBytSZBA8MIDhLmjixQYs6CRug=", // roughly 2021-12-10
+		//Value: "susgL7vNce2IqAq6HWBytSZBA8MIDhLmjixQYs6CRug=", // roughly 2021-12-10
+		Value: "3c7Wey0TrcWk0FmdSsZPdoQJE1Vho5Ytm71gySCVWfg=", // roughly 2021-12-12
 	}
 )
 

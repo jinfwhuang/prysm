@@ -4,9 +4,12 @@ import "C"
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
+	"github.com/golang/protobuf/proto"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/feed"
 	statefeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/state"
 	ethpbv1 "github.com/prysmaticlabs/prysm/proto/eth/v1"
+	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	tmplog "log"
 )
@@ -28,11 +31,7 @@ func (s *Service) subscribeEvents(ctx context.Context) {
 				root := headEvent.Block
 				s.processHeadEvent(ctx, root)
 			} else if ev.Type == statefeed.FinalizedCheckpoint {
-				tmplog.Println("=================")
-				tmplog.Println("=================")
-				tmplog.Println("FinalizedCheckpoint")
-				tmplog.Println("=================")
-				tmplog.Println("=================")
+				tmplog.Println("working with a statefeed.FinalizedCheckpoint")
 				root, err := s.cfg.HeadFetcher.HeadRoot(ctx)
 				if err != nil {
 					log.Error(err)
@@ -48,18 +47,16 @@ func (s *Service) subscribeEvents(ctx context.Context) {
 	}
 }
 
+// Save LightClientUpate
 func (s *Service) processHeadEvent(ctx context.Context, root []byte) error {
 	skipSyncUpdate, err := s.getNonFinalizedSkipSyncUpdate(ctx, root)
 	if err != nil {
 		return err
 	}
-
-	skipSyncUpdate = s.bestSkipSyncUpdate(ctx, skipSyncUpdate)
 	update := ToLightClientUpdate(skipSyncUpdate)
 
 	// Save data
 	s.Queue.Enqueue(update)
-	s.cfg.Database.SaveSkipSyncUpdate(ctx, skipSyncUpdate)
 
 	// DEBUG
 	currentSyncCommRoot, err := skipSyncUpdate.CurrentSyncCommittee.HashTreeRoot()
@@ -69,6 +66,13 @@ func (s *Service) processHeadEvent(ctx context.Context, root []byte) error {
 
 	return nil
 }
+
+func IsEmptyHeader(header *ethpb.BeaconBlockHeader) bool {
+	emptyHeader := &ethpb.BeaconBlockHeader{}
+	return proto.Equal(header, emptyHeader)
+}
+
+// Save LightClientUpdate and SkipSyncUpdate
 func (s *Service) processFinalizedEvent(ctx context.Context, root []byte) error {
 	skipSyncUpdate, err := s.getFinalizedSkipSyncUpdate(ctx, root)
 	if err != nil {
@@ -77,8 +81,19 @@ func (s *Service) processFinalizedEvent(ctx context.Context, root []byte) error 
 	if skipSyncUpdate == nil {
 		panic("creating a nil update")
 	}
-	skipSyncUpdate = s.bestSkipSyncUpdate(ctx, skipSyncUpdate)
+	if IsEmptyHeader(skipSyncUpdate.FinalityHeader) {
+		return fmt.Errorf("header is empty") // Ensure that SkipSyncUpdate is only created from FinalizedEvent
+	}
+	_skipSyncUpdate := s.bestSkipSyncUpdate(ctx, skipSyncUpdate)
+	if !IsEmptyHeader(_skipSyncUpdate.FinalityHeader) {
+		skipSyncUpdate = _skipSyncUpdate
+	}
+
 	update := ToLightClientUpdate(skipSyncUpdate)
+
+	if IsEmptyHeader(skipSyncUpdate.FinalityHeader) {
+		return fmt.Errorf("header is empty")
+	}
 
 	// Save data
 	s.Queue.Enqueue(update)

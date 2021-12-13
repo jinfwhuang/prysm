@@ -3,11 +3,17 @@ package sync
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
+	eth2_types "github.com/prysmaticlabs/eth2-types"
+	"github.com/prysmaticlabs/prysm/beacon-chain/core/signing"
+	"github.com/prysmaticlabs/prysm/config/params"
+	"github.com/prysmaticlabs/prysm/crypto/bls/blst"
+	"github.com/prysmaticlabs/prysm/crypto/bls/common"
 	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
 	"github.com/prysmaticlabs/prysm/encoding/ssz/ztype"
-	tmplog "log"
-
 	ethpb "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/time/slots"
+	tmplog "log"
 )
 
 const GenesisValidatorsRootBase64Str = "SzY9uU4oYSDXbrkFNA/dTlS/6fBr8z/2z1rSf1Eb/pU="
@@ -22,43 +28,70 @@ func init() {
 	GenesisValidatorsRoot = bytesutil.ToBytes32(b)
 }
 
-// TODO: refactor
+/**
+  # Verify update header root is the finalized root of the finality header, if specified
+  if update.finalized_header == BeaconBlockHeader():
+      assert update.finality_branch == [Bytes32() for _ in range(floorlog2(FINALIZED_ROOT_INDEX))]
+  else:
+      assert is_valid_merkle_branch(
+          leaf=hash_tree_root(update.finalized_header),
+          branch=update.finality_branch,
+          depth=floorlog2(FINALIZED_ROOT_INDEX),
+          index=get_subtree_index(FINALIZED_ROOT_INDEX),
+          root=update.attested_header.state_root,
+      )
+*/
 func verifyMerkleFinalityHeader(update *ethpb.LightClientUpdate) bool {
-	gIndex := ztype.CalculateGIndex(ztype.BeaconStateAltairType, 20, 1) // next_sync_committee  23
-	root := update.Header.StateRoot
-	leaf, err := update.FinalityHeader.HashTreeRoot() // ??? Is this hashroot correct? fastszz issue?  TODO: jin
-	if err != nil {
-		tmplog.Println(err)
-		panic(err)
+	if IsEmptyHeader(update.FinalityHeader) { // non-finzlied update
+		// TODO: check update.FinalityBranch integrity
+		return true
+	} else {
+		gIndex := ztype.CalculateGIndex(ztype.BeaconStateAltairType, 20, 1)
+		root := update.AttestedHeader.StateRoot
+		leaf, err := update.FinalityHeader.HashTreeRoot()
+		if err != nil {
+			tmplog.Println(err)
+			panic(err)
+		}
+		branch := update.FinalityBranch
+		return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
 	}
-	branch := update.FinalityBranch
-	return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
 }
 
 func verifyMerkleNextSyncComm(update *ethpb.LightClientUpdate) bool {
 	gIndex := ztype.CalculateGIndex(ztype.BeaconStateAltairType, 23) // next_sync_committee  23
-	root := update.Header.StateRoot
-	leaf, err := update.NextSyncCommittee.HashTreeRoot() // ??? Is this hashroot correct? fastszz issue?  TODO: jin
-
+	leaf, err := update.NextSyncCommittee.HashTreeRoot()
 	if err != nil {
 		tmplog.Println(err)
 		panic(err)
 	}
 	branch := update.NextSyncCommitteeBranch
-	return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
+
+	if IsEmptyHeader(update.FinalityHeader) { // non-finzlied update
+		root := update.AttestedHeader.StateRoot
+		return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
+	} else {
+		root := update.FinalityHeader.StateRoot
+		return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
+	}
 }
 
 func verifyMerkleCurrentSyncComm(update *ethpb.SkipSyncUpdate) bool {
 	gIndex := ztype.CalculateGIndex(ztype.BeaconStateAltairType, 22) // current_sync_committee  22
-	root := update.Header.StateRoot
 	leaf, err := update.CurrentSyncCommittee.HashTreeRoot()
-
 	if err != nil {
 		tmplog.Println(err)
 		panic(err)
 	}
 	branch := update.CurrentSyncCommitteeBranch
-	return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
+
+	if IsEmptyHeader(update.FinalityHeader) { // non-finzalied update
+		root := update.AttestedHeader.StateRoot
+		return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
+	} else { // finalized update
+		root := update.FinalityHeader.StateRoot
+		return ztype.Verify(bytesutil.ToBytes32(root), gIndex, leaf, branch)
+	}
 }
 
 func validateMerkleSkipSyncUpdate(update *ethpb.SkipSyncUpdate) error {
@@ -71,11 +104,111 @@ func validateMerkleSkipSyncUpdate(update *ethpb.SkipSyncUpdate) error {
 	return nil
 }
 
-func validateMerkleAll(update *ethpb.LightClientUpdate) error {
+func validateMerkleLightClientUpdate(update *ethpb.LightClientUpdate) error {
 	verified := verifyMerkleFinalityHeader(update)
 	verified = verified && verifyMerkleNextSyncComm(update)
 	if !verified {
 		return errors.New("update has invalid merkle proof")
 	}
 	return nil
+}
+
+func validateLightClientUpdate(
+	store *ethpb.LightClientStore,
+	update *ethpb.LightClientUpdate,
+	currentSlot eth2_types.Slot,
+	genesisValidatorsRoot [32]byte,
+) error {
+	// # Internal consistency
+	err := validateMerkleLightClientUpdate(update)
+	if err != nil {
+		return err
+	}
+
+	// Verify update slot is larger than slot of current best finalized header
+	activeHeader := getActiveHeader(update)
+	if currentSlot < activeHeader.Slot || activeHeader.Slot < store.FinalizedHeader.Slot {
+		return fmt.Errorf("update slot is invalid")
+	}
+	// Verify update does not skip a sync committee period
+	finalizedPeriod := slots.ToEpoch(store.FinalizedHeader.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
+	updatePeriod := slots.ToEpoch(activeHeader.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
+	if updatePeriod != finalizedPeriod && updatePeriod != finalizedPeriod+1 {
+		return fmt.Errorf("update period is invalid")
+	}
+
+	// Verify sync committee has sufficient participants
+	if update.SyncCommitteeBits.Count() < params.BeaconConfig().MinSyncCommitteeParticipants {
+		return errors.New("insufficient participants")
+	}
+
+	// # Verify sync committee aggregate signature
+	syncCommittee := store.CurrentSyncCommittee
+	if updatePeriod == finalizedPeriod+1 {
+		syncCommittee = store.NextSyncCommittee
+	}
+	err = verifySign(syncCommittee, update, genesisValidatorsRoot)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+/*
+	participant_pubkeys = [pubkey for (bit, pubkey) in zip(update.sync_committee_bits, sync_committee.pubkeys) if bit]
+	domain = compute_domain(DOMAIN_SYNC_COMMITTEE, update.fork_version, genesis_validators_root)
+	signing_root = compute_signing_root(update.attested_header, domain)
+	assert bls.FastAggregateVerify(participant_pubkeys, signing_root, update.sync_committee_signature)
+*/
+func verifySign(
+	syncCommittee *ethpb.SyncCommittee,
+	update *ethpb.LightClientUpdate,
+	genesisValidatorsRoot [32]byte,
+) error {
+	activeHeader := getActiveHeader(update)
+	participantPubkeys := make([][]byte, 0)
+	for i, pubKey := range syncCommittee.Pubkeys {
+		bit := update.SyncCommitteeBits.BitAt(uint64(i))
+		if bit {
+			participantPubkeys = append(participantPubkeys, pubKey)
+		}
+	}
+	domain, err := signing.ComputeDomain(
+		params.BeaconConfig().DomainSyncCommittee,
+		update.ForkVersion,
+		genesisValidatorsRoot[:],
+	)
+	if err != nil {
+		return err
+	}
+	signingRoot, err := signing.ComputeSigningRoot(activeHeader, domain)
+	if err != nil {
+		return err
+	}
+	sig, err := blst.SignatureFromBytes(update.SyncCommitteeSignature[:])
+	if err != nil {
+		return err
+	}
+	pubKeys := make([]common.PublicKey, 0)
+	for _, pubkey := range participantPubkeys {
+		pk, err := blst.PublicKeyFromBytes(pubkey)
+		if err != nil {
+			return err
+		}
+		pubKeys = append(pubKeys, pk)
+	}
+	if !sig.FastAggregateVerify(pubKeys, signingRoot) {
+		return errors.New("failed to verify")
+	}
+	return nil
+
+}
+
+func getActiveHeader(update *ethpb.LightClientUpdate) *ethpb.BeaconBlockHeader {
+	if IsEmptyHeader(update.FinalityHeader) {
+		return update.AttestedHeader
+	} else {
+		return update.FinalityHeader
+	}
 }

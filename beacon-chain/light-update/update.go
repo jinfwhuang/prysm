@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/golang/protobuf/proto"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state"
 	statev1 "github.com/prysmaticlabs/prysm/beacon-chain/state/v1"
 	statev2 "github.com/prysmaticlabs/prysm/beacon-chain/state/v2"
@@ -70,10 +69,6 @@ func (s *Service) getNonFinalizedSkipSyncUpdate(ctx context.Context, root []byte
 		SyncCommitteeSignature:     syncAgg.SyncCommitteeSignature,
 		ForkVersion:                st.Fork().CurrentVersion,
 	}
-
-	// TODO: remove
-	emptyHeader := &ethpb.BeaconBlockHeader{}
-	tmplog.Println(proto.Equal(update.FinalityHeader, emptyHeader))
 
 	return update, nil
 }

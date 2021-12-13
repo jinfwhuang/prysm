@@ -20,9 +20,9 @@ func GetTrustedCurrentCommitteeRoot() string {
 	if err != nil {
 		panic(err)
 	}
-	server := ethpb.NewLightClientClient(conn)
+	updateClient := ethpb.NewLightUpdateClient(conn)
 
-	resp, err := server.DebugGetTrustedCurrentCommitteeRoot(ctx, &empty.Empty{})
+	resp, err := updateClient.DebugGetTrustedCurrentCommitteeRoot(ctx, &empty.Empty{})
 	if err != nil {
 		panic(err)
 	}

@@ -15,6 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	tmplog "log"
 	"sync"
+	"time"
 )
 
 func init() {
@@ -135,6 +136,13 @@ func (s *Service) waitForChainInitialization(ctx context.Context) {
 				log.WithField("genesisTime", data.StartTime).Info(
 					"Received chain initialization event",
 				)
+				tmplog.Println(data.StartTime)
+				tmplog.Println(data.StartTime.Unix())
+				tmplog.Println(data.StartTime.UnixMilli())
+				tmplog.Println(data.StartTime.UnixMicro())
+				tmplog.Println(data.StartTime.UnixNano())
+				tmplog.Println(data.StartTime.Nanosecond())
+				tmplog.Println(time.UnixMilli(data.StartTime.Unix()))
 				return
 			}
 		case err := <-stateSub.Err():

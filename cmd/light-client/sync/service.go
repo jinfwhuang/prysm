@@ -10,8 +10,10 @@ import (
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	eth2_types "github.com/prysmaticlabs/eth2-types"
 	grpcutil "github.com/prysmaticlabs/prysm/api/grpc"
 	"github.com/prysmaticlabs/prysm/config/params"
+	"github.com/prysmaticlabs/prysm/time/slots"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,7 +42,9 @@ const (
 )
 
 var (
-	EpochsPerSyncCommitteePeriod = params.BeaconConfig().EpochsPerSyncCommitteePeriod
+	EpochsPerSyncCommitteePeriod        = params.BeaconConfig().EpochsPerSyncCommitteePeriod
+	UpdateTimeout                       = params.BeaconConfig().SlotsPerEpoch.Mul(uint64(params.BeaconConfig().EpochsPerSyncCommitteePeriod))
+	MinSyncCommitteeParticipants uint64 = 1
 )
 
 func (s SyncMode) String() string {
@@ -51,23 +55,18 @@ func (s SyncMode) String() string {
 }
 
 type Service struct {
-	cfg    *Config
-	ctx    context.Context
-	cancel context.CancelFunc
-	lock   sync.RWMutex
+	cfg         *Config
+	ctx         context.Context
+	cancel      context.CancelFunc
+	lock        sync.RWMutex
+	genesisTime time.Time
 
 	dataDir string
 	Store   *ethpb.LightClientStore
 
 	// grpc
-	conn *grpc.ClientConn
-	//grpcRetryDelay        time.Duration
-	//grpcRetries           uint
-	//maxCallRecvMsgSize    int
-	//withCert              string
-	//endpoint              string
-
-	lightClientServer ethpb.LightClientClient
+	conn              *grpc.ClientConn
+	lightUpdateClient ethpb.LightUpdateClient
 }
 
 type Config struct {
@@ -92,9 +91,12 @@ Design:
 func NewService(ctx context.Context, cfg *Config) (*Service, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	svr := &Service{
-		ctx:    ctx,
-		cancel: cancel,
-		cfg:    cfg,
+		ctx:         ctx,
+		cancel:      cancel,
+		cfg:         cfg,
+		genesisTime: time.Unix(1606824023, 0), // 2020-12-01 04:00:23 -0800 PST
+		// nano: 32536808316530000
+
 	}
 	return svr, nil
 }
@@ -131,8 +133,9 @@ func (s *Service) Start() {
 		panic(err)
 	}
 	s.conn = conn
-	s.lightClientServer = ethpb.NewLightClientClient(s.conn)
+	s.lightUpdateClient = ethpb.NewLightUpdateClient(s.conn)
 
+	// TODO: re-enable
 	// 1. Recover from a file location if possible
 	s.initStore()
 	tmplog.Println("Initialized store.")
@@ -146,11 +149,12 @@ func (s *Service) Start() {
 }
 
 func (s *Service) initStore() {
-	// Attempt to recover from disk
-	s.tryRecoverStore()
-	if s.Store != nil {
-		return
-	}
+	// TODO: re-enable
+	//// Attempt to recover from disk
+	//s.tryRecoverStore()
+	//if s.Store != nil {
+	//	return
+	//}
 
 	// Init store for the first time
 	// Fetch a skip-sync-update
@@ -161,7 +165,7 @@ func (s *Service) initStore() {
 	}
 	update, err := s.lookupSkipSync(key)
 	if err != nil {
-		panic("cannot initialize")
+		panic(err)
 	}
 
 	// Validate
@@ -169,48 +173,64 @@ func (s *Service) initStore() {
 	if err != nil {
 		panic(err) // TODO: retry another skip-sync-update
 	}
+
 	// Initialize a Store
 	store := &ethpb.LightClientStore{
-		Updates: []*ethpb.LightClientUpdate{},
-		Snapshot: &ethpb.LightClientSnapshot{
-			Header:               update.Header,
-			CurrentSyncCommittee: update.CurrentSyncCommittee,
-			NextSyncCommittee:    update.NextSyncCommittee,
-		},
+		FinalizedHeader:               update.FinalityHeader,
+		OptimisticHeader:              update.AttestedHeader,
+		CurrentSyncCommittee:          update.CurrentSyncCommittee,
+		NextSyncCommittee:             update.NextSyncCommittee,
+		PreviousMaxActiveParticipants: update.SyncCommitteeBits.Count(),
+		CurrentMaxActiveParticipants:  update.SyncCommitteeBits.Count(),
+		BestValidUpdate:               toLightClientUpdate(update),
 	}
+
+	tmplog.Println("-----")
+	tmplog.Println("store.OptimisticHeader", store.OptimisticHeader == nil)
+	tmplog.Println("store.BestValidUpdate", store.BestValidUpdate == nil)
+	tmplog.Println("store.CurrentSyncCommittee", store.CurrentSyncCommittee == nil)
+	tmplog.Println("store.NextSyncCommittee", store.NextSyncCommittee == nil)
+	tmplog.Println("-----")
+
 	s.Store = store
 }
 
 // Skip sync until we could use normal updates (ethereum.eth.v1alpha1.LightClient.GetUpdates) to sync
+// Skip sync only use update.finality_header
 func (s *Service) skipSync() {
-	resp, err := s.lightClientServer.GetUpdates(s.ctx, &empty.Empty{})
+	resp, err := s.lightUpdateClient.GetUpdates(s.ctx, &empty.Empty{})
 	if err != nil || len(resp.GetUpdates()) < 1 {
-		panic(err) // TODO: retry
+		panic(err) // TODO: implement retry retry
 	}
-	update := resp.Updates[0] // TODO: retry
-	err = validateMerkleAll(update)
+	update := resp.Updates[0] // TODO: we could use other updates from resp
+	err = validateMerkleLightClientUpdate(update)
 	if err != nil {
-		panic(err) // TODO: try other updates, or try another request
+		panic(err) // TODO: implement retry
 	}
 	expectedNextSyncComm := update.NextSyncCommittee
 	expectedNextSyncCommRoot, err := expectedNextSyncComm.HashTreeRoot()
 	if err != nil {
-		panic(err)
+		panic(err) // TODO: implement retry
 	}
 
-	storedNextSyncCommRoot, err := s.Store.Snapshot.NextSyncCommittee.HashTreeRoot()
+	storedNextSyncCommRoot, err := s.Store.NextSyncCommittee.HashTreeRoot()
 	if err != nil {
 		panic(err)
 	}
-	count := 0
+
 	// Skip sync until we could use the expected next-sync-committee
+	count := 0
 	for {
 		// Stop the skip sync once we could use LightClientUpdate to sync normally
 		if storedNextSyncCommRoot == expectedNextSyncCommRoot {
+			tmplog.Println("----")
+			tmplog.Println("Successfully skip-sync")
+			tmplog.Printf(StoreToString(s.Store))
+			tmplog.Println("----")
 			break
 		}
 
-		skipSyncKey, err := s.Store.Snapshot.NextSyncCommittee.HashTreeRoot()
+		skipSyncKey, err := s.Store.NextSyncCommittee.HashTreeRoot()
 		if err != nil {
 			panic(err)
 		}
@@ -232,36 +252,33 @@ func (s *Service) skipSync() {
 		// Skip sync
 		s.simpleProcessSkipSyncUpdate(skipSyncUpdate) // TODO: there might be other checks?
 
-		storedCurrentSyncCommRoot, err := s.Store.Snapshot.CurrentSyncCommittee.HashTreeRoot()
-		if err != nil {
-			panic(err)
-		}
-		storedNextSyncCommRoot, err = s.Store.Snapshot.NextSyncCommittee.HashTreeRoot()
-		if err != nil {
-			panic(err)
-		}
-
-		skipSyncNextSyncCommRoot, err := skipSyncUpdate.NextSyncCommittee.HashTreeRoot()
-		if err != nil {
-			panic(err)
-		}
+		// DEBUG messages only
 		skipSyncCurrentSyncCommRoot, err := skipSyncUpdate.CurrentSyncCommittee.HashTreeRoot()
 		if err != nil {
 			panic(err)
 		}
-
-		// DEBUG messages only
+		skipSyncNextSyncCommRoot, err := skipSyncUpdate.NextSyncCommittee.HashTreeRoot()
+		if err != nil {
+			panic(err)
+		}
+		storedCurrentSyncCommRoot, err := s.Store.CurrentSyncCommittee.HashTreeRoot()
+		if err != nil {
+			panic(err)
+		}
+		storedNextSyncCommRoot, err = s.Store.NextSyncCommittee.HashTreeRoot()
+		if err != nil {
+			panic(err)
+		}
 		tmplog.Printf("-----skip sync: %d------", count)
-		tmplog.Println("expected: ", update.Header)
-		tmplog.Println("Store:    ", s.Store.Snapshot.Header)
-
-		tmplog.Println("expected Next:   ", base64.StdEncoding.EncodeToString(expectedNextSyncCommRoot[:]))
-		tmplog.Println("stored   Next:   ", base64.StdEncoding.EncodeToString(storedNextSyncCommRoot[:]))
-		tmplog.Println("skip     Next:   ", base64.StdEncoding.EncodeToString(skipSyncNextSyncCommRoot[:]))
+		tmplog.Println("expected: ", update.FinalityHeader)
+		tmplog.Println("Store:    ", s.Store.FinalizedHeader)
 
 		tmplog.Println("Store    Current:", base64.StdEncoding.EncodeToString(storedCurrentSyncCommRoot[:]))
 		tmplog.Println("skip     Current:", base64.StdEncoding.EncodeToString(skipSyncCurrentSyncCommRoot[:]))
-		tmplog.Println("skip     Period:", int(skipSyncUpdate.Header.Slot)/int(EpochsPerSyncCommitteePeriod))
+
+		tmplog.Println("expected Next:   ", base64.StdEncoding.EncodeToString(expectedNextSyncCommRoot[:]))
+		tmplog.Println("skip     Next:   ", base64.StdEncoding.EncodeToString(skipSyncNextSyncCommRoot[:]))
+		tmplog.Println("stored   Next:   ", base64.StdEncoding.EncodeToString(storedNextSyncCommRoot[:]))
 
 		time.Sleep(time.Second * 1) // TODO: debug only
 		count += 1
@@ -271,27 +288,32 @@ func (s *Service) skipSync() {
 func (s *Service) sync(ctx context.Context) {
 	count := 0
 	for {
-		currentSyncRoot, _ := s.Store.Snapshot.CurrentSyncCommittee.HashTreeRoot()
-		nextSyncRoot, _ := s.Store.Snapshot.NextSyncCommittee.HashTreeRoot()
-		resp, err := s.lightClientServer.GetUpdates(s.ctx, &emptypb.Empty{})
+		currentSyncRoot, _ := s.Store.CurrentSyncCommittee.HashTreeRoot()
+		nextSyncRoot, _ := s.Store.NextSyncCommittee.HashTreeRoot()
+		resp, err := s.lightUpdateClient.GetUpdates(s.ctx, &emptypb.Empty{})
 		if err != nil {
 			panic(err) // TODO: retry instead
 		}
 		update := resp.Updates[0]
-		updateNextSyncRoot, _ := update.NextSyncCommittee.HashTreeRoot()
 
+		// DEBUG
+		updateNextSyncRoot, _ := update.NextSyncCommittee.HashTreeRoot()
 		tmplog.Printf("----------%d----------", count)
-		tmplog.Println("header slot         :", s.Store.Snapshot.Header.Slot)
-		tmplog.Println("header period       :", int(s.Store.Snapshot.Header.Slot)/int(EpochsPerSyncCommitteePeriod))
-		tmplog.Println("header current sync :", base64.StdEncoding.EncodeToString(currentSyncRoot[:]))
-		tmplog.Println("header next sync    :", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
-		tmplog.Println("update slot         :", update.Header.Slot)
-		tmplog.Println("update period       :", int(update.Header.Slot)/int(EpochsPerSyncCommitteePeriod))
+		tmplog.Println("optic slot          : ", s.Store.OptimisticHeader.Slot)
+		tmplog.Println("optic period        :", int(s.Store.OptimisticHeader.Slot)/int(EpochsPerSyncCommitteePeriod))
+		tmplog.Println("finality slot       : ", s.Store.FinalizedHeader.Slot)
+		tmplog.Println("finality period     :", int(s.Store.FinalizedHeader.Slot)/int(EpochsPerSyncCommitteePeriod))
+		tmplog.Println("current sync        :", base64.StdEncoding.EncodeToString(currentSyncRoot[:]))
+		tmplog.Println("next sync           :", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
+		tmplog.Printf("--")
+		tmplog.Println("update slot         :", update.AttestedHeader.Slot)
+		tmplog.Println("update period       :", int(update.AttestedHeader.Slot)/int(EpochsPerSyncCommitteePeriod))
 		tmplog.Println("update next sync    :", base64.StdEncoding.EncodeToString(updateNextSyncRoot[:]))
+		// END OF DEBUG
 
 		s.processLightClientUpdate(update)
-
 		s.saveSnapshot()
+
 		time.Sleep(time.Second * 12) // TODO: use a slot tick instead
 		count += 1
 	}
@@ -299,13 +321,18 @@ func (s *Service) sync(ctx context.Context) {
 }
 
 func (s *Service) simpleProcessSkipSyncUpdate(update *ethpb.SkipSyncUpdate) {
-	s.Store.Snapshot.Header = update.FinalityHeader
-	s.Store.Snapshot.CurrentSyncCommittee = update.CurrentSyncCommittee
-	s.Store.Snapshot.NextSyncCommittee = update.NextSyncCommittee
+	s.Store.FinalizedHeader = update.FinalityHeader
+	s.Store.CurrentSyncCommittee = update.CurrentSyncCommittee
+	s.Store.NextSyncCommittee = update.NextSyncCommittee
 }
 
 func (s *Service) processLightClientUpdate(update *ethpb.LightClientUpdate) {
-	processLightClientUpdate(s.Store, update, s.Store.Snapshot.Header.Slot, GenesisValidatorsRoot)
+	currentSlot := s.CurrentSlot()
+	processLightClientUpdate(s.Store, update, currentSlot, GenesisValidatorsRoot)
+}
+
+func (s *Service) CurrentSlot() eth2_types.Slot {
+	return slots.CurrentSlot(uint64(s.genesisTime.Unix()))
 }
 
 // Stop the blockchain service's main event loop and associated goroutines.
@@ -357,30 +384,36 @@ func (s *Service) tryRecoverStore() {
 		panic(err)
 	}
 	s.Store = store
-	tmplog.Println("Recovered store.snapshot: %s", SnapshotToString(s.Store.Snapshot))
+	tmplog.Printf("Recovered store: %s", StoreToString(s.Store))
 }
 
-func SnapshotToString(snapshot *ethpb.LightClientSnapshot) string {
-	_currentSyncCommRoot, err := snapshot.CurrentSyncCommittee.HashTreeRoot()
+func StoreToString(store *ethpb.LightClientStore) string {
+	_currentSyncCommRoot, err := store.CurrentSyncCommittee.HashTreeRoot()
 	if err != nil {
 		panic(err)
 	}
 	currentSyncCommRoot := base64.StdEncoding.EncodeToString(_currentSyncCommRoot[:])
 
-	_nextSyncCommRoot, err := snapshot.NextSyncCommittee.HashTreeRoot()
+	_nextSyncCommRoot, err := store.NextSyncCommittee.HashTreeRoot()
 	if err != nil {
 		panic(err)
 	}
 	nextSyncCommRoot := base64.StdEncoding.EncodeToString(_nextSyncCommRoot[:])
-	headerStr := snapshot.Header.String()
-	s := fmt.Sprintf("header=%s|current-sync=%s|next-sync=%s", headerStr, currentSyncCommRoot, nextSyncCommRoot)
+
+	s := fmt.Sprintf(
+		"optimistic header=%s \n"+
+			"finality header=%s \n"+
+			"current-sync=%s \n "+
+			"next-sync=%s",
+		store.OptimisticHeader.String(), store.FinalizedHeader.String(), currentSyncCommRoot, nextSyncCommRoot,
+	)
 
 	return s
 }
 
 // TODO: hacky
 func (s *Service) lookupSkipSync(key []byte) (*ethpb.SkipSyncUpdate, error) {
-	update, err := s.lightClientServer.GetSkipSyncUpdate(s.ctx, &ethpb.SkipSyncRequest{
+	update, err := s.lightUpdateClient.GetSkipSyncUpdate(s.ctx, &ethpb.SkipSyncRequest{
 		Key: key,
 	})
 	if err != nil && strings.Contains(err.Error(), "cannot find skip sync error") {
@@ -391,7 +424,12 @@ func (s *Service) lookupSkipSync(key []byte) (*ethpb.SkipSyncUpdate, error) {
 		errMsg := fmt.Sprintf("cannot find skip sync error; requesting key=%s", keyStr)
 		tmplog.Printf(errMsg)
 		tmplog.Printf("The backing beacon-node, %s, does not have the requested ski-sync-update", s.cfg.FullNodeServerEndpoint)
-		tmplog.Printf("Consider starting the lightnode with: --trusted-current-committee-root='%s'", recommendedKeyStr)
+		tmplog.Printf("---------------")
+		tmplog.Printf("---------------")
+		tmplog.Printf("Consider starting the lightnode with:")
+		tmplog.Printf("--trusted-current-committee-root='%s'", recommendedKeyStr)
+		tmplog.Printf("---------------")
+		tmplog.Printf("---------------")
 		return nil, fmt.Errorf(errMsg)
 	} else if err != nil {
 		tmplog.Printf("check if address %s is available", s.cfg.FullNodeServerEndpoint)
