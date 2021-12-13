@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package ethereum.eth.v1alpha1;
+
+import "proto/eth/ext/options.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+
+import "proto/prysm/v1alpha1/attestation.proto";
+import "proto/prysm/v1alpha1/beacon_state.proto";
+import "proto/prysm/v1alpha1/beacon_block.proto";
+import "proto/prysm/v1alpha1/sync_committee.proto";
+
+option csharp_namespace = "Ethereum.Eth.V1alpha1";
+option go_package = "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1;eth";
+option java_multiple_files = true;
+option java_outer_classname = "LightNode";
+option java_package = "org.ethereum.eth.v1alpha1";
+option php_namespace = "Ethereum\\Eth\\v1alpha1";
+
+// Light Client Node
+service LightNode {
+  rpc Head(google.protobuf.Empty) returns (BeaconBlockHeader) {
+    option (google.api.http) = {
+      get: "/internal/eth/v1/beacon/head"
+    };
+  }
+
+  rpc FinalizedHead(google.protobuf.Empty) returns (BeaconBlockHeader) {
+    option (google.api.http) = {
+      get: "/internal/eth/v1/beacon/finalized-head"
+    };
+  }
+}

@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package ethereum.eth.v1alpha1;
+
+import "proto/eth/ext/options.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+
+import "proto/prysm/v1alpha1/attestation.proto";
+import "proto/prysm/v1alpha1/beacon_state.proto";
+import "proto/prysm/v1alpha1/beacon_block.proto";
+import "proto/prysm/v1alpha1/sync_committee.proto";
+
+option csharp_namespace = "Ethereum.Eth.V1alpha1";
+option go_package = "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1;eth";
+option java_multiple_files = true;
+option java_outer_classname = "LightUpdate";
+option java_package = "org.ethereum.eth.v1alpha1";
+option php_namespace = "Ethereum\\Eth\\v1alpha1";
+
+// Services
+service LightUpdate {
+  rpc GetUpdates(google.protobuf.Empty) returns (UpdatesResponse) {
+    option (google.api.http) = {
+      get: "/eth/v1alpha1/light-update/updates",
+    };
+  }
+  rpc GetSkipSyncUpdate(SkipSyncRequest) returns (SkipSyncUpdate) {
+    option (google.api.http) = {
+      get: "/eth/v1alpha1/light-update/skip-sync",
+    };
+  }
+  rpc DebugGetTrustedCurrentCommitteeRoot(google.protobuf.Empty) returns (DebugGetTrustedCurrentCommitteeRootResp) {
+    option (google.api.http) = {
+      get: "/eth/v1alpha1/light-update/debug-get-trusted-sync-comm-root",
+    };
+  }
+}
+
+message UpdatesResponse {
+  repeated LightClientUpdate updates = 1;
+}
+
+message SkipSyncRequest {
+  // Merkle root of a SyncCommittee, the current sync committee
+  bytes key = 1 [(ethereum.eth.ext.ssz_size) = "32"];
+}
+
+message DebugGetTrustedCurrentCommitteeRootResp {
+  // Merkle root of a SyncCommittee, the current sync committee
+  bytes key = 1 [(ethereum.eth.ext.ssz_size) = "32"];
+}
+
+/*
+https://github.com/ethereum/consensus-specs/blob/vbuterin-patch-12/specs/altair/sync-protocol.md
+
+class LightClientUpdate(Container):
+    # The beacon block header that is attested to by the sync committee
+    attested_header: BeaconBlockHeader
+    # Next sync committee corresponding to the active header
+    next_sync_committee: SyncCommittee
+    next_sync_committee_branch: Vector[Bytes32, floorlog2(NEXT_SYNC_COMMITTEE_INDEX)]
+    # The finalized beacon block header attested to by Merkle branch
+    finalized_header: BeaconBlockHeader
+    finality_branch: Vector[Bytes32, floorlog2(FINALIZED_ROOT_INDEX)]
+    # Sync committee aggregate signature
+    sync_committee_bits: Bitvector[SYNC_COMMITTEE_SIZE]
+    sync_committee_signature: BLSSignature
+    # Fork version for the aggregate signature
+    fork_version: Version
+ */
+message LightClientUpdate {
+  // The beacon block header that is attested to by the sync committee
+  ethereum.eth.v1alpha1.BeaconBlockHeader attested_header = 1;
+
+  // If finality_header is not empty, next sync committee corresponds to the finality_header
+  // Otherwise, corresponding to the attested_header
+  ethereum.eth.v1alpha1.SyncCommittee next_sync_committee = 2;
+  repeated bytes next_sync_committee_branch = 3 [(ethereum.eth.ext.ssz_size) = "5,32"];
+
+  // If finality_header is not empty, hashroot(finality_headerFinality) == attested_header.finality_checkpoint.root
+  ethereum.eth.v1alpha1.BeaconBlockHeader finality_header = 4;
+  repeated bytes finality_branch = 5 [(ethereum.eth.ext.ssz_size) = "6,32"];
+
+  // Always signing off the attested_header
+  bytes sync_committee_bits = 6 [(ethereum.eth.ext.ssz_size) = "sync_committee_bytes.size", (ethereum.eth.ext.cast_type) = "sync_committee_bits.type"];
+  bytes sync_committee_signature = 7 [(ethereum.eth.ext.ssz_size) = "96"];
+
+  // Fork version for the aggregate signature
+  bytes fork_version = 8 [(ethereum.eth.ext.ssz_size) = "4"];
+}
+
+// This only differs from LightClientUpdate in that it contains: current_sync_committee
+message SkipSyncUpdate {
+  // The beacon block header that is attested to by the sync committee
+  ethereum.eth.v1alpha1.BeaconBlockHeader attested_header = 1;
+
+  // If finality_header is not empty, it corresponds to the finality_header.
+  // Otherwise, corresponds to the attested_header
+  ethereum.eth.v1alpha1.SyncCommittee current_sync_committee = 2;
+  repeated bytes current_sync_committee_branch = 3 [(ethereum.eth.ext.ssz_size) = "5,32"];
+
+  // If finality_header is not empty, next sync committee corresponds to the finality_header
+  // Otherwise, corresponding to the attested_header
+  ethereum.eth.v1alpha1.SyncCommittee next_sync_committee = 4;
+  repeated bytes next_sync_committee_branch = 5 [(ethereum.eth.ext.ssz_size) = "5,32"];
+
+  // If finality_header is not empty, hashroot(finality_headerFinality) == attested_header.finality_checkpoint.root
+  ethereum.eth.v1alpha1.BeaconBlockHeader finality_header = 6;
+  repeated bytes finality_branch = 7 [(ethereum.eth.ext.ssz_size) = "6,32"];
+
+  // Always signing off the attested_header
+  bytes sync_committee_bits = 8 [(ethereum.eth.ext.ssz_size) = "sync_committee_bytes.size", (ethereum.eth.ext.cast_type) = "sync_committee_bits.type"];
+  bytes sync_committee_signature = 9 [(ethereum.eth.ext.ssz_size) = "96"];
+
+  // Fork version for the aggregate signature
+  bytes fork_version = 10 [(ethereum.eth.ext.ssz_size) = "4"];
+
+}
+
+/**
+class LightClientStore(object):
+    # Beacon block header that is finalized
+    finalized_header: BeaconBlockHeader
+    # Sync committees corresponding to the header
+    current_sync_committee: SyncCommittee
+    next_sync_committee: SyncCommittee
+    # Best available header to switch finalized head to if we see nothing else
+    best_valid_update: Optional[LightClientUpdate]
+    # Most recent available reasonably-safe header
+    optimistic_header: BeaconBlockHeader
+    # Max number of active participants in a sync committee (used to calculate safety threshold)
+    previous_max_active_participants: uint64
+    current_max_active_participants: uint64
+ */
+message LightClientStore {
+  ethereum.eth.v1alpha1.BeaconBlockHeader finalized_header = 1;
+  ethereum.eth.v1alpha1.BeaconBlockHeader optimistic_header = 2;
+  ethereum.eth.v1alpha1.SyncCommittee current_sync_committee = 3;
+  ethereum.eth.v1alpha1.SyncCommittee next_sync_committee = 4;
+
+  uint64 previous_max_active_participants = 5;
+  uint64 current_max_active_participants = 6;
+  ethereum.eth.v1alpha1.LightClientUpdate best_valid_update = 7;
+}

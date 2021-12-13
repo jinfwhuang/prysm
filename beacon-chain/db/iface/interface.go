@@ -147,7 +147,14 @@ type Database interface {
 	io.Closer
 	backup.BackupExporter
 	HeadAccessDatabase
+	LightClientDatabase
 
 	DatabasePath() string
 	ClearDB() error
+}
+
+// LightClientDatabase --
+type LightClientDatabase interface {
+	GetSkipSyncUpdate(ctx context.Context, key [32]byte) (*ethpb.SkipSyncUpdate, error)
+	SaveSkipSyncUpdate(ctx context.Context, update *ethpb.SkipSyncUpdate) error
 }

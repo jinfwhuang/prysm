@@ -199,6 +199,10 @@ func New(cliCtx *cli.Context, opts ...Option) (*BeaconNode, error) {
 		return nil, err
 	}
 
+	if err := beacon.registerLightUpdateService(); err != nil {
+		return nil, err
+	}
+
 	if err := beacon.registerRPCService(); err != nil {
 		return nil, err
 	}
@@ -725,6 +729,7 @@ func (b *BeaconNode) registerRPCService() error {
 	}
 
 	p2pService := b.fetchP2P()
+	lightUpdateService := b.fetchLightUpdateService()
 	rpcService := rpc.NewService(b.ctx, &rpc.Config{
 		Host:                    host,
 		Port:                    port,
@@ -763,6 +768,7 @@ func (b *BeaconNode) registerRPCService() error {
 		StateGen:                b.stateGen,
 		EnableDebugRPCEndpoints: enableDebugRPCEndpoints,
 		MaxMsgSize:              maxMsgSize,
+		LightUpdateService:      lightUpdateService,
 	})
 
 	return b.services.RegisterService(rpcService)

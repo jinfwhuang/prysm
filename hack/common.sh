@@ -23,10 +23,10 @@ readonly system
 findutil="find"
 # On OSX `find` is not GNU find compatible, so require "findutils" package.
 if [ "$system" == "darwin" ]; then
-    if [[ ! -x "/usr/local/bin/gfind" ]]; then
+    if hash gfind 2>/dev/null; then
+        export findutil="gfind"  # skipcq: SH-2034
+    else
         color 31 "Make sure that GNU 'findutils' package is installed: brew install findutils"
         exit 1
-    else
-        export findutil="gfind"  # skipcq: SH-2034
     fi
 fi

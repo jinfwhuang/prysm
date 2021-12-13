@@ -101,6 +101,8 @@ ssz_gen_marshal(
         "SigningData",
         "SyncCommittee",
         "SyncAggregatorSelectionData",
+        "LightClientUpdate",
+        "SkipSyncUpdate",
     ],
 )
 
@@ -190,6 +192,8 @@ ssz_proto_files(
         "beacon_block.proto",
         "beacon_state.proto",
         "sync_committee.proto",
+        "light_client.proto",
+        "light_update.proto",
     ],
     config = select({
         "//conditions:default": "mainnet",
