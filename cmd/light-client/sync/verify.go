@@ -28,19 +28,6 @@ func init() {
 	GenesisValidatorsRoot = bytesutil.ToBytes32(b)
 }
 
-/**
-  # Verify update header root is the finalized root of the finality header, if specified
-  if update.finalized_header == BeaconBlockHeader():
-      assert update.finality_branch == [Bytes32() for _ in range(floorlog2(FINALIZED_ROOT_INDEX))]
-  else:
-      assert is_valid_merkle_branch(
-          leaf=hash_tree_root(update.finalized_header),
-          branch=update.finality_branch,
-          depth=floorlog2(FINALIZED_ROOT_INDEX),
-          index=get_subtree_index(FINALIZED_ROOT_INDEX),
-          root=update.attested_header.state_root,
-      )
-*/
 func verifyMerkleFinalityHeader(update *ethpb.LightClientUpdate) bool {
 	if IsEmptyHeader(update.FinalityHeader) { // non-finzlied update
 		// TODO: check update.FinalityBranch integrity
@@ -119,7 +106,7 @@ func validateLightClientUpdate(
 	currentSlot eth2_types.Slot,
 	genesisValidatorsRoot [32]byte,
 ) error {
-	// # Internal consistency
+	// Internal consistency
 	err := validateMerkleLightClientUpdate(update)
 	if err != nil {
 		return err
@@ -130,10 +117,12 @@ func validateLightClientUpdate(
 	if currentSlot < activeHeader.Slot || activeHeader.Slot < store.FinalizedHeader.Slot {
 		return fmt.Errorf("update slot is invalid")
 	}
+
 	// Verify update does not skip a sync committee period
 	finalizedPeriod := slots.ToEpoch(store.FinalizedHeader.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
 	updatePeriod := slots.ToEpoch(activeHeader.Slot) / params.BeaconConfig().EpochsPerSyncCommitteePeriod
 	if updatePeriod != finalizedPeriod && updatePeriod != finalizedPeriod+1 {
+		// TODO: go to skip-sync mode instead
 		return fmt.Errorf("update period is invalid")
 	}
 
@@ -155,12 +144,7 @@ func validateLightClientUpdate(
 	return nil
 }
 
-/*
-	participant_pubkeys = [pubkey for (bit, pubkey) in zip(update.sync_committee_bits, sync_committee.pubkeys) if bit]
-	domain = compute_domain(DOMAIN_SYNC_COMMITTEE, update.fork_version, genesis_validators_root)
-	signing_root = compute_signing_root(update.attested_header, domain)
-	assert bls.FastAggregateVerify(participant_pubkeys, signing_root, update.sync_committee_signature)
-*/
+// TODO: better name
 func verifySign(
 	syncCommittee *ethpb.SyncCommittee,
 	update *ethpb.LightClientUpdate,
@@ -203,12 +187,4 @@ func verifySign(
 	}
 	return nil
 
-}
-
-func getActiveHeader(update *ethpb.LightClientUpdate) *ethpb.BeaconBlockHeader {
-	if IsEmptyHeader(update.FinalityHeader) {
-		return update.AttestedHeader
-	} else {
-		return update.FinalityHeader
-	}
 }

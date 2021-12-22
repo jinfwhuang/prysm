@@ -14,6 +14,7 @@ import (
 	grpcutil "github.com/prysmaticlabs/prysm/api/grpc"
 	"github.com/prysmaticlabs/prysm/config/params"
 	"github.com/prysmaticlabs/prysm/time/slots"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,9 +43,11 @@ const (
 )
 
 var (
-	EpochsPerSyncCommitteePeriod        = params.BeaconConfig().EpochsPerSyncCommitteePeriod
-	UpdateTimeout                       = params.BeaconConfig().SlotsPerEpoch.Mul(uint64(params.BeaconConfig().EpochsPerSyncCommitteePeriod))
-	MinSyncCommitteeParticipants uint64 = 1
+	EpochsPerSyncCommitteePeriod = params.BeaconConfig().EpochsPerSyncCommitteePeriod
+	UpdateTimeout                = params.BeaconConfig().SlotsPerEpoch.Mul(uint64(params.BeaconConfig().EpochsPerSyncCommitteePeriod))
+	SafetyThresholdPeriod        = params.BeaconConfig().SlotsPerEpoch.Mul(uint64(params.BeaconConfig().EpochsPerSyncCommitteePeriod)) / 2
+
+	//MinSyncCommitteeParticipants uint64 = 1
 )
 
 func (s SyncMode) String() string {
@@ -145,7 +148,7 @@ func (s *Service) Start() {
 	tmplog.Println("Finished skip sync.")
 
 	// 3. sync
-	go s.sync(s.ctx)
+	go s.sync()
 }
 
 func (s *Service) initStore() {
@@ -285,50 +288,60 @@ func (s *Service) skipSync() {
 	}
 }
 
-func (s *Service) sync(ctx context.Context) {
+func (s *Service) sync() {
 	count := 0
+	slotTicker := slots.NewSlotTicker(s.genesisTime, params.BeaconConfig().SecondsPerSlot)
 	for {
-		currentSyncRoot, _ := s.Store.CurrentSyncCommittee.HashTreeRoot()
-		nextSyncRoot, _ := s.Store.NextSyncCommittee.HashTreeRoot()
-		resp, err := s.lightUpdateClient.GetUpdates(s.ctx, &emptypb.Empty{})
-		if err != nil {
-			panic(err) // TODO: retry instead
+		select {
+		case currSlot := <-slotTicker.C():
+			//currEpoch := slots.ToEpoch(currSlot)
+			processSlotForLightClientStore(s.Store, currSlot)
+
+			resp, err := s.lightUpdateClient.GetUpdates(s.ctx, &emptypb.Empty{})
+			if err != nil {
+				panic(err) // TODO: retry instead
+			}
+			update := resp.Updates[0]
+			processLightClientUpdate(s.Store, update, currSlot, GenesisValidatorsRoot)
+
+			s.saveSnapshot()
+
+			// DEBUG
+			currentSyncRoot, _ := s.Store.CurrentSyncCommittee.HashTreeRoot()
+			nextSyncRoot, _ := s.Store.NextSyncCommittee.HashTreeRoot()
+			updateNextSyncRoot, _ := update.NextSyncCommittee.HashTreeRoot()
+			tmplog.Printf("----------%d----------", count)
+			tmplog.Println("update slot         :", update.AttestedHeader.Slot)
+			tmplog.Println("update period       :", int(update.AttestedHeader.Slot)/int(EpochsPerSyncCommitteePeriod))
+			tmplog.Println("update next sync    :", base64.StdEncoding.EncodeToString(updateNextSyncRoot[:]))
+			tmplog.Printf("--")
+			tmplog.Println("optimistic slot     :", s.Store.OptimisticHeader.Slot)
+			tmplog.Println("optimistic period   :", int(s.Store.OptimisticHeader.Slot)/int(EpochsPerSyncCommitteePeriod))
+			tmplog.Println("finality slot       :", s.Store.FinalizedHeader.Slot)
+			tmplog.Println("finality period     :", int(s.Store.FinalizedHeader.Slot)/int(EpochsPerSyncCommitteePeriod))
+			tmplog.Println("current sync        :", base64.StdEncoding.EncodeToString(currentSyncRoot[:]))
+			tmplog.Println("next sync           :", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
+			count += 1
+			// END OF DEBUG
+		case <-s.ctx.Done():
+			log.Debug("Context closed, exiting goroutine")
+			slotTicker.Done()
+			return
 		}
-		update := resp.Updates[0]
-
-		// DEBUG
-		updateNextSyncRoot, _ := update.NextSyncCommittee.HashTreeRoot()
-		tmplog.Printf("----------%d----------", count)
-		tmplog.Println("optic slot          : ", s.Store.OptimisticHeader.Slot)
-		tmplog.Println("optic period        :", int(s.Store.OptimisticHeader.Slot)/int(EpochsPerSyncCommitteePeriod))
-		tmplog.Println("finality slot       : ", s.Store.FinalizedHeader.Slot)
-		tmplog.Println("finality period     :", int(s.Store.FinalizedHeader.Slot)/int(EpochsPerSyncCommitteePeriod))
-		tmplog.Println("current sync        :", base64.StdEncoding.EncodeToString(currentSyncRoot[:]))
-		tmplog.Println("next sync           :", base64.StdEncoding.EncodeToString(nextSyncRoot[:]))
-		tmplog.Printf("--")
-		tmplog.Println("update slot         :", update.AttestedHeader.Slot)
-		tmplog.Println("update period       :", int(update.AttestedHeader.Slot)/int(EpochsPerSyncCommitteePeriod))
-		tmplog.Println("update next sync    :", base64.StdEncoding.EncodeToString(updateNextSyncRoot[:]))
-		// END OF DEBUG
-
-		s.processLightClientUpdate(update)
-		s.saveSnapshot()
-
-		time.Sleep(time.Second * 12) // TODO: use a slot tick instead
-		count += 1
 	}
-	tmplog.Println("xxx light client sync done processing xxx")
+}
+
+func processSlotForLightClientStore(store *ethpb.LightClientStore, currentSlot eth2_types.Slot) {
+	if currentSlot%SafetyThresholdPeriod == 0 {
+		store.PreviousMaxActiveParticipants = store.CurrentMaxActiveParticipants
+		store.CurrentMaxActiveParticipants = 0
+	}
 }
 
 func (s *Service) simpleProcessSkipSyncUpdate(update *ethpb.SkipSyncUpdate) {
 	s.Store.FinalizedHeader = update.FinalityHeader
 	s.Store.CurrentSyncCommittee = update.CurrentSyncCommittee
 	s.Store.NextSyncCommittee = update.NextSyncCommittee
-}
-
-func (s *Service) processLightClientUpdate(update *ethpb.LightClientUpdate) {
-	currentSlot := s.CurrentSlot()
-	processLightClientUpdate(s.Store, update, currentSlot, GenesisValidatorsRoot)
 }
 
 func (s *Service) CurrentSlot() eth2_types.Slot {
